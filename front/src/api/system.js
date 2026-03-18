@@ -1,0 +1,28 @@
+import request from '@/utils/request'
+
+export const getNoticePageAPI = (params) => request.get('/system/notices/page', { params })
+export const getNoticeDetailAPI = (id) => request.get(`/system/notices/${id}`)
+export const createNoticeAPI = (data) => request.post('/system/notices', data)
+export const updateNoticeAPI = (id, data) => request.put(`/system/notices/${id}`, data)
+export const deleteNoticeAPI = (id) => request.delete(`/system/notices/${id}`)
+
+export const getUserPageAPI = (params) => request.get('/system/users/page', { params })
+export const getUserDetailAPI = (id) => request.get(`/system/users/${id}`)
+export const createUserAPI = (data) => request.post('/system/users', data)
+export const updateUserAPI = (id, data) => request.put(`/system/users/${id}`, data)
+export const updateUserStatusAPI = (id, data) => request.put(`/system/users/${id}/status`, data)
+export const deleteUserAPI = (id) => request.delete(`/system/users/${id}`)
+export const resetUserPasswordAPI = (id, data) => request.put(`/system/users/${id}/password`, data)
+
+export const getDeptPageAPI = (params) => request.get('/system/depts/page', { params })
+export const getDeptOptionsAPI = () => request.get('/system/depts/options')
+export const getDeptDetailAPI = (id) => request.get(`/system/depts/${id}`)
+export const createDeptAPI = (data) => request.post('/system/depts', data)
+export const updateDeptAPI = (id, data) => request.put(`/system/depts/${id}`, data)
+export const deleteDeptAPI = (id) => request.delete(`/system/depts/${id}`)
+
+export const getEmployeePageAPI = (params) => request.get('/system/employees/page', { params })
+export const getEmployeeDetailAPI = (id) => request.get(`/system/employees/${id}`)
+export const createEmployeeAPI = (data) => request.post('/system/employees', data)
+export const updateEmployeeAPI = (id, data) => request.put(`/system/employees/${id}`, data)
+export const deleteEmployeeAPI = (id) => request.delete(`/system/employees/${id}`)

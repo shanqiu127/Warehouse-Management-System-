@@ -1,0 +1,11 @@
+target/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Eclipse/STS files
+.classpath
+.project
+.settings/

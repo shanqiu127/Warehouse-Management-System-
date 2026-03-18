@@ -1,0 +1,56 @@
+/* 全局统一的页面风格和表单间距优化 */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+  background-color: #f0f2f5;
+}
+
+/* 统一卡片内边距，使其不至于太拥挤 */
+.el-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+}
+
+.el-card__body {
+  padding: 24px;
+}
+
+/* 统一搜索区域表单项间距 */
+.search-box .el-form-item {
+  margin-bottom: 20px;
+  margin-right: 18px;
+}
+
+/* 统一弹窗内表单项的间距 */
+.el-dialog__body .el-form-item {
+  margin-bottom: 22px;
+}
+
+/* 优化表格显示，防止表格被内容撑爆屏幕 */
+.el-table {
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* 针对小屏幕设备的基础自适应处理 */
+@media screen and (max-width: 768px) {
+  .el-card__body {
+    padding: 15px;
+  }
+  
+  .search-box .el-form-item {
+    margin-right: 0;
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .el-form--inline .el-form-item__content {
+    width: 100%;
+  }
+
+  .el-dialog {
+    width: 90% !important;
+  }
+}
