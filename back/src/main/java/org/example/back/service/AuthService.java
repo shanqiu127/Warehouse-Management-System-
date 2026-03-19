@@ -50,6 +50,9 @@ public class AuthService {
             throw BusinessException.unauthorized("用户名或密码错误");
         }
 
+        // 角色值做规范化，避免数据库脏数据（空格/大小写）导致权限误判。
+        user.setRole(normalizeRole(user.getRole()));
+
         // 登录时间滚动更新：上次登录 <- 本次登录；本次登录 <- now
         LocalDateTime previousLoginTime = user.getCurrentLoginTime();
         user.setLastLoginTime(previousLoginTime);
@@ -60,7 +63,7 @@ public class AuthService {
 
         LoginResponse.UserInfoVO userInfo = buildUserInfoVO(user);
         StpUtil.getSession().set("userInfo", userInfo);
-        StpUtil.getSession().set("role", user.getRole());
+        StpUtil.getSession().set("role", userInfo.getRole());
 
         String tokenValue = StpUtil.getTokenValue();
         return new LoginResponse(tokenValue, userInfo);
@@ -146,6 +149,18 @@ public class AuthService {
      */
     public boolean isAdmin() {
         LoginResponse.UserInfoVO userInfo = getUserInfo();
-        return ROLE_ADMIN.equals(userInfo.getRole()) || ROLE_superadmin.equals(userInfo.getRole());
+        String role = normalizeRole(userInfo.getRole());
+        return ROLE_ADMIN.equals(role) || ROLE_superadmin.equals(role);
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null) {
+            return "";
+        }
+        String normalized = role.trim().toLowerCase();
+        if ("super_admin".equals(normalized)) {
+            return ROLE_superadmin;
+        }
+        return normalized;
     }
 }

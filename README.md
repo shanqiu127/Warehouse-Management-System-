@@ -21,6 +21,13 @@
 - 数据库：MySQL 8.0
 - 运行环境：JDK 17、Node.js 16+
 
+## 环境准备
+
+- JDK 17：后端基于 Spring Boot 3，必须有 Java 17 环境。
+- Maven（MVN）：用于编译和启动后端。项目自带 Maven Wrapper（`mvnw` / `mvnw.cmd`）(即使未全局安装 Maven 也通常可以直接运行)。
+- Node.js（建议 18+）和 npm：前端基于 Vue 3 + Vite，需要用 npm 安装依赖并启动前端。
+- MySQL 8.0：项目数据存储在 MySQL，需先执行初始化 SQL 脚本。
+
 ## 目录结构
 
 ```text
@@ -39,12 +46,12 @@ git clone <你的仓库地址>
 cd "Warehouse Management System"
 ```
 
-> Windows 下也可直接进入项目根目录后继续下面步骤。
+
 
 ### 2. 初始化数据库
 
-1. 在 MySQL 8.0 中创建数据库（建议字符集 utf8mb4）。
-2. 执行根目录脚本：`db.sql`。
+1. 创建数据库（建议字符集 utf8mb4）。
+2. 执行根目录数据库脚本：`db.sql`。
 
 ### 配置文件说明
 
@@ -56,8 +63,8 @@ cd "Warehouse Management System"
 
 ```bash
 cd back
-mvnw.cmd -DskipTests compile
-mvnw.cmd spring-boot:run
+.\mvnw.cmd -DskipTests compile
+.\mvnw.cmd spring-boot:run
 ```
 
 后端默认地址：`http://localhost:8080`
@@ -72,10 +79,6 @@ npm run dev
 
 前端默认地址：`http://localhost:5173`
 
-## 接口文档
-
-- Knife4j：`http://localhost:8080/api/doc.html`
-- OpenAPI JSON：`http://localhost:8080/api/v3/api-docs`
 
 ## 默认账号（可按需修改）
 
@@ -90,6 +93,11 @@ npm run dev
 - `superadmin`：超级管理员，具备管理员全部能力
 - `admin`：管理员，负责系统与业务管理
 - `employee`：普通用户，以查看权限为主
+
+## 接口文档
+
+- Knife4j：`http://localhost:8080/api/doc.html`
+- OpenAPI JSON：`http://localhost:8080/api/v3/api-docs`
 
 ---
 

@@ -36,6 +36,11 @@ const rules = {
   password: [{ required: true, message: '密码不可为空', trigger: 'blur' }]
 }
 
+const normalizeRole = (role) => {
+  const normalized = String(role || '').trim().toLowerCase()
+  return normalized === 'super_admin' ? 'superadmin' : normalized
+}
+
 const handleLogin = () => {
   formRef.value.validate(async (valid) => {
     if (valid) {
@@ -46,11 +51,12 @@ const handleLogin = () => {
         }
 
         userStore.setToken(res.data.token)
-        userStore.setRole(res.data.userInfo?.role || '')
+        const currentRole = normalizeRole(res.data.userInfo?.role)
+        userStore.setRole(currentRole)
 
-        const roleText = userStore.role === 'superadmin'
+        const roleText = currentRole === 'superadmin'
           ? '超级管理员'
-          : (userStore.role === 'admin' ? '管理员' : '普通员工')
+          : (currentRole === 'admin' ? '管理员' : '普通员工')
         ElMessage.success(`登录成功，当前角色：${roleText}`)
         router.push('/')
       } catch (error) {

@@ -14,13 +14,10 @@ front/node_modules/
 *.key
 *.pem
 
-# Backend local/prod config (machine-specific)
+
 # Keep back/src/main/resources/application.properties tracked for quick start.
-!back/src/main/resources/application.properties
-back/src/main/resources/application.example.properties
-back/src/main/resources/application-local.properties
-back/src/main/resources/application-prod.properties
-back/src/main/resources/application-*.local.properties
+back/src/main/resources/application.properties
+
 
 # Frontend local env files
 front/.env
@@ -45,3 +42,4 @@ yarn-debug.log*
 yarn-error.log*
 
 tmpclaude-b90e-cwd
+twelve-auth.postman_collection.json

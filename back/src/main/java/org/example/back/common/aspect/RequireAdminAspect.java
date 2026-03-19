@@ -35,7 +35,11 @@ public class RequireAdminAspect {
         }
 
         // 3. 从 Session 中获取用户角色
-        String role = (String) StpUtil.getSession().get("role");
+        Object roleObj = StpUtil.getSession().get("role");
+        String role = roleObj == null ? "" : String.valueOf(roleObj).trim().toLowerCase();
+        if ("super_admin".equals(role)) {
+            role = "superadmin";
+        }
 
         // 4. 校验是否为管理员
         if (!"admin".equals(role) && !"superadmin".equals(role)) {

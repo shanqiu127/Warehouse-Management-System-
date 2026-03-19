@@ -61,32 +61,32 @@ const router = createRouter({
           path: "business/sales-chart",
           name: "BusinessSalesChart",
           component: () => import("../views/business/SalesChartView.vue"),
-          meta: { roles: ['admin'] } 
+          meta: { roles: ['admin', 'superadmin'] } 
         },
         // 以下为动态权限测试页面（仅管理员可用）
         {
           path: "system/notice",
           name: "SystemNotice",
           component: () => import("../views/system/NoticeView.vue"),
-          meta: { roles: ['admin'] } 
+          meta: { roles: ['admin', 'superadmin'] } 
         },
         {
           path: "system/user",
           name: "SystemUser",
           component: () => import("../views/system/UserView.vue"),
-          meta: { roles: ['admin'] } 
+          meta: { roles: ['admin', 'superadmin'] } 
         },
         {
           path: "system/dept",
           name: "SystemDept",
           component: () => import("../views/system/DeptView.vue"),
-          meta: { roles: ['admin'] } 
+          meta: { roles: ['admin', 'superadmin'] } 
         },
         {
           path: "system/employee",
           name: "SystemEmployee",
           component: () => import("../views/system/EmployeeView.vue"),
-          meta: { roles: ['admin'] } 
+          meta: { roles: ['admin', 'superadmin'] } 
         }
       ]
     },

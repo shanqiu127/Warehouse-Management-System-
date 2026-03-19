@@ -84,10 +84,16 @@ const noticeLoading = ref(false)
 const noticeDialogVisible = ref(false)
 const noticeDetail = ref({ title: '', date: '', author: '', content: '' })
 
+const normalizeRole = (role) => {
+  const normalized = String(role || '').trim().toLowerCase()
+  return normalized === 'super_admin' ? 'superadmin' : normalized
+}
+
 const roleLabel = (role) => {
-  if (role === 'superadmin') return '超级管理员'
-  if (role === 'admin') return '管理员'
-  if (role === 'employee') return '普通用户'
+  const normalized = normalizeRole(role)
+  if (normalized === 'superadmin') return '超级管理员'
+  if (normalized === 'admin') return '管理员'
+  if (normalized === 'employee') return '普通用户'
   return '未知角色'
 }
 
@@ -101,15 +107,20 @@ const now = new Date()
 const nowDateText = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 const weekdayText = weekdays[now.getDay()]
 
-const isSuperAdmin = computed(() => summary.value.role === 'superadmin')
-const isEmployee = computed(() => summary.value.role === 'employee')
+const isSuperAdmin = computed(() => normalizeRole(summary.value.role) === 'superadmin')
+const isEmployee = computed(() => normalizeRole(summary.value.role) === 'employee')
 
 const loadSummary = async () => {
   const res = await getHomeSummaryAPI()
   if (res.code !== 200) {
     throw new Error(res.msg || '首页汇总加载失败')
   }
-  summary.value = res.data || summary.value
+  const data = res.data || {}
+  summary.value = {
+    ...summary.value,
+    ...data,
+    role: normalizeRole(data.role)
+  }
 }
 
 const loadNotices = async () => {

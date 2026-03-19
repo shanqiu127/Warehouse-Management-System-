@@ -12,8 +12,10 @@ export const useUserStore = defineStore("user", () => {
   }
 
   const setRole = (newRole) => {
-    role.value = newRole
-    persistRole(newRole)
+    const roleText = String(newRole || "").trim().toLowerCase()
+    const normalizedRole = roleText === "super_admin" ? "superadmin" : roleText
+    role.value = normalizedRole
+    persistRole(normalizedRole)
   }
 
   const clearToken = () => {
