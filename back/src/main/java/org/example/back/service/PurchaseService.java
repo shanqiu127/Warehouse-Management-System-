@@ -125,6 +125,7 @@ public class PurchaseService {
     public void voidDocument(Long id, DocumentVoidDTO dto) {
         BizPurchase purchase = requirePurchase(id);
         ensureNormalStatus(purchase.getBizStatus(), "进货单");
+        validateHistoricalRedFlushOnly(purchase.getOperationTime(), dto, "进货单");
 
         decreaseStock(purchase.getGoodsId(), purchase.getQuantity(), "当前库存不足，无法作废该进货单");
 
@@ -194,6 +195,17 @@ public class PurchaseService {
             throw BusinessException.validateFail(docName + "已作废，禁止重复操作");
         }
         throw BusinessException.validateFail(docName + "为红冲单，禁止删除或再次作废");
+    }
+
+    private void validateHistoricalRedFlushOnly(LocalDateTime operationTime, DocumentVoidDTO dto, String docName) {
+        if (operationTime == null) {
+            return;
+        }
+        boolean isToday = operationTime.toLocalDate().equals(LocalDate.now());
+        boolean createRedFlush = dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush());
+        if (!isToday && !createRedFlush) {
+            throw BusinessException.validateFail("历史" + docName + "仅支持作废红冲");
+        }
     }
 
     private String normalizeReason(String reason) {

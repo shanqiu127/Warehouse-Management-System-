@@ -101,6 +101,7 @@ public class SalesService {
     public void voidDocument(Long id, DocumentVoidDTO dto) {
         BizSales entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "销售单");
+        validateHistoricalRedFlushOnly(entity.getOperationTime(), dto, "销售单");
 
         increaseStock(entity.getGoodsId(), entity.getQuantity());
 
@@ -170,6 +171,17 @@ public class SalesService {
             throw BusinessException.validateFail(docName + "已作废，禁止重复操作");
         }
         throw BusinessException.validateFail(docName + "为红冲单，禁止删除或再次作废");
+    }
+
+    private void validateHistoricalRedFlushOnly(LocalDateTime operationTime, DocumentVoidDTO dto, String docName) {
+        if (operationTime == null) {
+            return;
+        }
+        boolean isToday = operationTime.toLocalDate().equals(LocalDate.now());
+        boolean createRedFlush = dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush());
+        if (!isToday && !createRedFlush) {
+            throw BusinessException.validateFail("历史" + docName + "仅支持作废红冲");
+        }
     }
 
     private String normalizeReason(String reason) {

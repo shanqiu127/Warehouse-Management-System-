@@ -2,6 +2,12 @@
   <div class="sales-return-container">
     <el-card>
       <div class="search-box">
+        <div class="top-right-help">
+          <span class="help-label">作废红冲:</span>
+          <el-tooltip content="作废红冲：保留原单并生成反向红字记录，便于审计追溯。" placement="left">
+            <el-icon class="void-help-icon"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </div>
         <el-form :inline="true" :model="searchForm">
           <el-form-item label="退货单号">
             <el-input v-model="searchForm.keywords" placeholder="请输入销售退货单号或商品名" clearable></el-input>
@@ -23,10 +29,18 @@
         <el-table-column prop="refundAmount" label="退货金额(元)" width="120" />
         <el-table-column prop="returnDate" label="退货日期" width="180" />
         <el-table-column prop="operator" label="操作人" width="100" />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="190" fixed="right">
           <template #default="scope">
-            <el-button size="small" type="primary" link @click="handleView(scope.row)">详情</el-button>
-            <el-button v-permission="['admin']" size="small" type="danger" link @click="handleDelete(scope.row)">删除</el-button>
+            <div class="action-group">
+              <el-button size="small" type="primary" link @click="handleView(scope.row)">详情</el-button>
+              <template v-if="canDelete(scope.row)">
+                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleDelete(scope.row)">删除</el-button>
+              </template>
+              <template v-else-if="canRedFlush(scope.row)">
+                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废红冲</el-button>
+              </template>
+              <span v-else class="action-disabled">{{ actionDisabledText(scope.row) }}</span>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -63,7 +77,13 @@
           </el-input>
         </el-form-item>
         <el-form-item label="退货日期" prop="returnDate">
-          <el-date-picker v-model="dialogForm.returnDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" style="width: 100%" />
+          <el-date-picker
+            v-model="dialogForm.returnDate"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="请选择退货时间"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="退货原因" prop="reason">
           <el-input v-model="dialogForm.reason" type="textarea" placeholder="填写退换货原因"></el-input>
@@ -82,12 +102,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import {
   createSalesReturnAPI,
   deleteSalesReturnAPI,
   getGoodsOptionsAPI,
   getSalesReturnDetailAPI,
-  getSalesReturnPageAPI
+  getSalesReturnPageAPI,
+  voidSalesReturnAPI
 } from '@/api/business'
 
 const searchForm = reactive({ keywords: '' })
@@ -120,6 +142,59 @@ const dialogRules = {
 const normalizeDateTime = (val) => {
   if (!val) return ''
   return String(val).replace('T', ' ')
+}
+
+const toDateOnly = (val) => {
+  if (!val) return ''
+  return String(val).slice(0, 10)
+}
+
+const localToday = () => {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+const canDelete = (row) => {
+  if (row?.__uiDeleted) return false
+  if (row?.bizStatus !== 1) return false
+  return toDateOnly(row?.returnDate) === localToday()
+}
+
+const canRedFlush = (row) => {
+  if (row?.__uiDeleted) return false
+  if (row?.bizStatus !== 1) return false
+  return toDateOnly(row?.returnDate) !== localToday()
+}
+
+const actionDisabledText = (row) => {
+  if (row?.__uiDeleted) return '已删除'
+  if (row?.bizStatus === 2) return '已作废'
+  if (row?.bizStatus === 3) return '已红冲'
+  if (row?.bizStatus === 1) return '已删除'
+  return '不可操作'
+}
+
+const buildOperationTime = (selectedDate) => {
+  if (!selectedDate) return undefined
+  return String(selectedDate).replace(' ', 'T')
+}
+
+const chooseFrontendRecordBehavior = async () => {
+  try {
+    await ElMessageBox.confirm('操作已完成，是否保留当前列表中的前端记录？', '前端记录处理', {
+      type: 'info',
+      confirmButtonText: '保留',
+      cancelButtonText: '移除',
+      distinguishCancelAndClose: true
+    })
+    return 'keep'
+  } catch (action) {
+    if (action === 'cancel') return 'remove'
+    return 'keep'
+  }
 }
 
 const loadGoodsOptions = async () => {
@@ -197,7 +272,7 @@ const handleView = async (row) => {
       goodsId: detail.goodsId ?? null,
       quantity: detail.quantity ?? 1,
       unitPrice: detail.unitPrice ?? (detail.refundAmount && detail.quantity ? Number(detail.refundAmount) / Number(detail.quantity) : 0),
-      returnDate: detail.returnDate ? String(detail.returnDate).slice(0, 10) : '',
+      returnDate: normalizeDateTime(detail.returnDate),
       reason: detail.reason || detail.remark || ''
     })
     dialogVisible.value = true
@@ -213,12 +288,49 @@ const handleDelete = (row) => {
       throw new Error(res.msg || '删除失败')
     }
     ElMessage.success('删除成功')
-    loadList()
+    const behavior = await chooseFrontendRecordBehavior()
+    if (behavior === 'remove') {
+      tableData.value = tableData.value.filter((item) => item.id !== row.id)
+      return
+    }
+    row.__uiDeleted = true
   }).catch((error) => {
     if (error?.message) {
       ElMessage.error(error.message)
     }
   })
+}
+
+const handleVoid = async (row, createRedFlush) => {
+  try {
+    const title = createRedFlush ? '作废并红冲' : '作废单据'
+    const promptText = createRedFlush ? '请输入红冲原因（可选）' : '请输入作废原因（可选）'
+    const { value } = await ElMessageBox.prompt(promptText, title, {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPlaceholder: '默认: 手工作废',
+      inputValue: ''
+    })
+
+    const res = await voidSalesReturnAPI(row.id, {
+      reason: value || '',
+      createRedFlush
+    })
+    if (res.code !== 200) {
+      throw new Error(res.msg || '操作失败')
+    }
+    ElMessage.success(createRedFlush ? '已完成作废红冲' : '作废成功')
+    const behavior = await chooseFrontendRecordBehavior()
+    if (behavior === 'remove') {
+      tableData.value = tableData.value.filter((item) => item.id !== row.id)
+      return
+    }
+    row.bizStatus = createRedFlush ? 3 : 2
+  } catch (error) {
+    if (error?.message && error.message !== 'cancel') {
+      ElMessage.error(error.message)
+    }
+  }
 }
 
 const submitForm = () => {
@@ -231,7 +343,7 @@ const submitForm = () => {
         goodsId: dialogForm.goodsId,
         quantity: dialogForm.quantity,
         unitPrice: Number(dialogForm.unitPrice),
-        operationTime: dialogForm.returnDate ? `${dialogForm.returnDate}T00:00:00` : undefined,
+        operationTime: buildOperationTime(dialogForm.returnDate),
         remark: dialogForm.reason || ''
       }
       const res = await createSalesReturnAPI(payload)
@@ -259,6 +371,41 @@ onMounted(async () => {
 
 <style scoped>
 .search-box {
+  position: relative;
   margin-bottom: 20px;
+}
+
+.top-right-help {
+  position: absolute;
+  right: 0;
+  top: -8px;
+  color: #909399;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 2;
+}
+
+.help-label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.action-disabled {
+  color: #999;
+  font-size: 12px;
+}
+
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.void-help-icon {
+  color: #909399;
+  font-size: 15px;
+  cursor: pointer;
 }
 </style>
