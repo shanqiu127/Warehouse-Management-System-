@@ -15,8 +15,7 @@ front/node_modules/
 *.pem
 
 
-# Keep back/src/main/resources/application.properties tracked for quick start.
-back/src/main/resources/application.properties
+
 
 
 # Frontend local env files
