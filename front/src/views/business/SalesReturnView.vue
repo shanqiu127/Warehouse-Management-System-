@@ -12,6 +12,16 @@
           <el-form-item label="退货单号">
             <el-input v-model="searchForm.keywords" placeholder="请输入销售退货单号" clearable></el-input>
           </el-form-item>
+          <el-form-item label="退货日期">
+            <el-date-picker
+              v-model="searchForm.dateRange"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              value-format="YYYY-MM-DD"
+            />
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleSearch">查询</el-button>
             <el-button @click="resetSearch">重置</el-button>
@@ -131,7 +141,7 @@ import {
   voidSalesReturnAPI
 } from '@/api/business'
 
-const searchForm = reactive({ keywords: '' })
+const searchForm = reactive({ keywords: '', dateRange: [] })
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -235,10 +245,13 @@ const handleSourceSalesChange = (sourceSalesId) => {
 const loadList = async () => {
   loading.value = true
   try {
+    const hasDateRange = Array.isArray(searchForm.dateRange) && searchForm.dateRange.length === 2
     const params = {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
-      returnNo: searchForm.keywords || undefined
+      returnNo: searchForm.keywords || undefined,
+      startDate: hasDateRange ? searchForm.dateRange[0] : undefined,
+      endDate: hasDateRange ? searchForm.dateRange[1] : undefined
     }
     const res = await getSalesReturnPageAPI(params)
     if (res.code !== 200) {
@@ -264,6 +277,7 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchForm.keywords = ''
+  searchForm.dateRange = []
   currentPage.value = 1
   loadList()
 }

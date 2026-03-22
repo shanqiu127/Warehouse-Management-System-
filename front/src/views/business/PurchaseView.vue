@@ -232,12 +232,13 @@ const loadGoodsOptions = async () => {
 const loadList = async () => {
   loading.value = true
   try {
+    const hasDateRange = Array.isArray(searchForm.dateRange) && searchForm.dateRange.length === 2
     const params = {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
       purchaseNo: searchForm.keywords || undefined,
-      startDate: searchForm.dateRange?.[0] || undefined,
-      endDate: searchForm.dateRange?.[1] || undefined
+      startDate: hasDateRange ? searchForm.dateRange[0] : undefined,
+      endDate: hasDateRange ? searchForm.dateRange[1] : undefined
     }
     const res = await getPurchasePageAPI(params)
     if (res.code !== 200) {

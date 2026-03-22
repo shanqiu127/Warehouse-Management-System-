@@ -34,6 +34,30 @@
       </el-row>
     </el-card>
 
+    <el-row :gutter="16" class="content-row" v-if="isSuperAdmin">
+      <el-col :xs="24" :lg="24">
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header card-header-row">
+              <span>系统错误监控</span>
+              <el-tag type="danger" effect="light">24h: {{ summary.errorCount24h || 0 }}</el-tag>
+            </div>
+          </template>
+          <el-table :data="summary.recentErrorLogs || []" size="small" stripe empty-text="暂无系统错误日志">
+            <el-table-column prop="createTime" label="时间" width="180">
+              <template #default="scope">
+                {{ formatTime(scope.row.createTime) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="statusCode" label="状态码" width="90" />
+            <el-table-column prop="errorType" label="错误类型" width="180" show-overflow-tooltip />
+            <el-table-column prop="requestUri" label="请求路径" min-width="210" show-overflow-tooltip />
+            <el-table-column prop="message" label="错误摘要" min-width="240" show-overflow-tooltip />
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-row :gutter="16" class="content-row" v-if="isEmployee">
       <el-col :xs="24" :lg="24">
         <el-card shadow="never">
@@ -76,7 +100,9 @@ const summary = ref({
   role: '',
   currentLoginTime: null,
   lastLoginTime: null,
-  dbStatus: ''
+  dbStatus: '',
+  errorCount24h: 0,
+  recentErrorLogs: []
 })
 
 const noticeList = ref([])
@@ -243,6 +269,13 @@ onMounted(async () => {
 .card-header {
   font-weight: 700;
   color: #2f3b47;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 @media (max-width: 768px) {

@@ -12,12 +12,17 @@
           <el-menu-item index="/base/goods">商品资料管理</el-menu-item>
         </el-sub-menu>
 
-        <!-- 业务常用菜单，所有角色可见 -->
-        <el-sub-menu index="/business">
-          <template #title>库存业务</template>
+        <!-- 进货菜单，所有角色可见 -->
+        <el-sub-menu index="/purchase">
+          <template #title>进货</template>
           <el-menu-item index="/business/purchase">商品进货</el-menu-item>
           <el-menu-item index="/business/purchase-return">进货退货单</el-menu-item>
-          <el-menu-item index="/business/sales">销售单</el-menu-item>
+        </el-sub-menu>
+
+        <!-- 销售菜单，所有角色可见 -->
+        <el-sub-menu index="/sales">
+          <template #title>销售</template>
+          <el-menu-item index="/business/sales">商品销售</el-menu-item>
           <el-menu-item index="/business/sales-return">销售退货单</el-menu-item>
         </el-sub-menu>
 

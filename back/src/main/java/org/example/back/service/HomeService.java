@@ -6,12 +6,14 @@ import org.example.back.entity.SysErrorLog;
 import org.example.back.entity.SysUser;
 import org.example.back.mapper.SysErrorLogMapper;
 import org.example.back.mapper.SysUserMapper;
+import org.example.back.vo.ErrorLogBriefVO;
 import org.example.back.vo.HomeSummaryVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class HomeService {
@@ -41,9 +43,14 @@ public class HomeService {
         vo.setLastLoginTime(user == null ? null : user.getLastLoginTime());
         vo.setServerTime(LocalDateTime.now());
 
-        if ("superadmin".equals(userInfo.getRole())) {
+        String role = userInfo.getRole();
+        if ("superadmin".equalsIgnoreCase(role)) {
             vo.setDbStatus(checkDbStatus());
+        }
+
+        if ("superadmin".equalsIgnoreCase(role)) {
             vo.setErrorCount24h(countErrorLogsLast24h());
+            vo.setRecentErrorLogs(queryRecentErrorLogs(5));
         }
 
         return vo;
@@ -61,7 +68,33 @@ public class HomeService {
     private Long countErrorLogsLast24h() {
         LocalDateTime begin = LocalDateTime.now().minusHours(24);
         LambdaQueryWrapper<SysErrorLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.ge(SysErrorLog::getCreateTime, begin);
+        wrapper.ge(SysErrorLog::getCreateTime, begin)
+                .ge(SysErrorLog::getStatusCode, 500);
         return sysErrorLogMapper.selectCount(wrapper);
+    }
+
+    private List<ErrorLogBriefVO> queryRecentErrorLogs(int limit) {
+        LambdaQueryWrapper<SysErrorLog> wrapper = new LambdaQueryWrapper<>();
+        wrapper.ge(SysErrorLog::getStatusCode, 500)
+                .orderByDesc(SysErrorLog::getCreateTime)
+                .last("LIMIT " + Math.max(limit, 1));
+
+        return sysErrorLogMapper.selectList(wrapper).stream().map(item -> {
+            ErrorLogBriefVO vo = new ErrorLogBriefVO();
+            vo.setRequestUri(item.getRequestUri());
+            vo.setMethod(item.getMethod());
+            vo.setStatusCode(item.getStatusCode());
+            vo.setErrorType(item.getErrorType());
+            vo.setMessage(safeMessageForHome(item.getMessage()));
+            vo.setCreateTime(item.getCreateTime());
+            return vo;
+        }).toList();
+    }
+
+    private String safeMessageForHome(String message) {
+        if (message == null) {
+            return "";
+        }
+        return message.length() > 120 ? message.substring(0, 120) + "..." : message;
     }
 }

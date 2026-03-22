@@ -10,21 +10,25 @@
         <p class="brand-tag">WAREHOUSE MANAGEMENT SYSTEM</p>
         <h1>仓储秩序，<br>由你掌控</h1>
         <p class="brand-desc">
-          聚焦入库、出库、退货与库存盘点，
+          聚焦进货、退货、销售盘点，
           让每一次流转都可追溯、可分析、可复盘。
         </p>
         <ul class="brand-metrics">
           <li>
-            <strong>入库</strong>
+            <strong>进货</strong>
             <span>批次与供应商追踪</span>
           </li>
           <li>
-            <strong>出库</strong>
-            <span>销售与退货闭环</span>
+            <strong>退货</strong>
+            <span>退货流程与原因分析</span>
           </li>
           <li>
-            <strong>库存</strong>
-            <span>实时预警与看板洞察</span>
+            <strong>作废红冲</strong>
+            <span>作废与红冲流程管理</span>
+          </li>
+          <li>
+            <strong>统计</strong>
+            <span>数据可视化与分析图</span>
           </li>
         </ul>
       </section>

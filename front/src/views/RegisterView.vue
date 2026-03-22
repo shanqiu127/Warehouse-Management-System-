@@ -10,8 +10,7 @@
         <p class="brand-tag">WAREHOUSE MANAGEMENT SYSTEM</p>
         <h1>开始你的<br>仓储协作</h1>
         <p class="brand-desc">
-          新账号仅用于普通员工协作接入，
-          建立统一库存视图并参与标准业务流程。
+          一个现代化的仓储管理解决方案
         </p>
         <ul class="brand-metrics">
           <li>
@@ -25,6 +24,10 @@
           <li>
             <strong>可追溯</strong>
             <span>业务轨迹完整留痕</span>
+          </li>
+          <li>
+            <strong>高效</strong>
+            <span>操作界面简洁流畅</span>
           </li>
         </ul>
       </section>

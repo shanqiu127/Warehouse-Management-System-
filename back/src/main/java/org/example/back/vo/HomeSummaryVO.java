@@ -3,6 +3,7 @@ package org.example.back.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class HomeSummaryVO {
@@ -30,4 +31,9 @@ public class HomeSummaryVO {
      * 最近24小时系统错误日志数
      */
     private Long errorCount24h;
+
+    /**
+     * 最近系统错误日志（仅首页摘要展示）
+     */
+    private List<ErrorLogBriefVO> recentErrorLogs;
 }
