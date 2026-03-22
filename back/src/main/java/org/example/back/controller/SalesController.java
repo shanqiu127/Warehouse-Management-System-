@@ -9,9 +9,12 @@ import org.example.back.dto.SalesQueryDTO;
 import org.example.back.dto.SalesSaveDTO;
 import org.example.back.dto.DocumentVoidDTO;
 import org.example.back.service.SalesService;
+import org.example.back.vo.SalesSourceOptionVO;
 import org.example.back.vo.SalesVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/business/sales")
@@ -28,6 +31,11 @@ public class SalesController {
     @GetMapping("/{id}")
     public Result<SalesVO> getById(@PathVariable Long id) {
         return Result.success(salesService.getById(id));
+    }
+
+    @GetMapping("/options/returnable")
+    public Result<List<SalesSourceOptionVO>> returnableOptions(@RequestParam(required = false) Long goodsId) {
+        return Result.success(salesService.returnableOptions(goodsId));
     }
 
     @PostMapping

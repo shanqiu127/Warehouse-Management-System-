@@ -3,14 +3,14 @@
     <el-card>
       <div class="search-box">
         <div class="top-right-help">
-          <span class="help-label">作废红冲:</span>
-          <el-tooltip content="作废红冲：保留原单并生成反向红字记录，便于审计追溯。" placement="left">
+          <span class="help-label">作废/红冲:</span>
+          <el-tooltip content="仅作废：撤销业务并回滚库存；作废并红冲：额外生成红冲单用于审计追溯。" placement="left">
             <el-icon class="void-help-icon"><QuestionFilled /></el-icon>
           </el-tooltip>
         </div>
         <el-form :inline="true" :model="searchForm">
           <el-form-item label="退货单号">
-            <el-input v-model="searchForm.keywords" placeholder="请输入退货单号或商品名" clearable></el-input>
+            <el-input v-model="searchForm.keywords" placeholder="请输入退货单号" clearable></el-input>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleSearch">查询</el-button>
@@ -31,15 +31,16 @@
         <el-table-column prop="returnDate" label="退货日期" width="180" />
         <el-table-column prop="operator" label="操作人" width="100" />
         <el-table-column prop="reason" label="退货原因" show-overflow-tooltip />
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="scope">
             <div class="action-group">
               <el-button size="small" type="primary" link @click="handleView(scope.row)">查看</el-button>
               <template v-if="canDelete(scope.row)">
                 <el-button v-permission="['admin']" size="small" type="danger" link @click="handleDelete(scope.row)">删除</el-button>
               </template>
-              <template v-else-if="canRedFlush(scope.row)">
-                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废红冲</el-button>
+              <template v-else-if="canVoid(scope.row)">
+                <el-button v-permission="['admin']" size="small" type="warning" link @click="handleVoid(scope.row, false)">仅作废</el-button>
+                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废并红冲</el-button>
               </template>
               <span v-else class="action-disabled">{{ actionDisabledText(scope.row) }}</span>
             </div>
@@ -62,10 +63,27 @@
 
     <el-dialog :title="dialogType === 'view' ? '查看退货信息' : '发起退货'" v-model="dialogVisible" width="500px">
       <el-form ref="dialogFormRef" :model="dialogForm" :rules="dialogRules" label-width="100px" :disabled="dialogType === 'view'">
-        <el-form-item label="退货商品" prop="goodsId">
-          <el-select v-model="dialogForm.goodsId" placeholder="请选择商品" style="width: 100%">
-            <el-option v-for="item in goodsOptions" :key="item.id" :label="item.name" :value="item.id" />
+        <el-form-item label="来源进货单" prop="sourcePurchaseId">
+          <el-select
+            v-model="dialogForm.sourcePurchaseId"
+            placeholder="请选择来源进货单"
+            style="width: 100%"
+            filterable
+            @change="handleSourcePurchaseChange"
+          >
+            <el-option
+              v-for="item in sourcePurchaseOptions"
+              :key="item.id"
+              :label="`${item.purchaseNo} | ${item.goodsName} | 可退:${item.returnableQuantity}`"
+              :value="item.id"
+            />
           </el-select>
+        </el-form-item>
+        <el-form-item label="退货商品">
+          <el-input :value="selectedSourcePurchase?.goodsName || '-'" disabled />
+        </el-form-item>
+        <el-form-item label="可退数量">
+          <el-input :value="String(selectedSourcePurchase?.returnableQuantity ?? '-')" disabled />
         </el-form-item>
         <el-form-item label="退货数量" prop="returnQuantity">
           <el-input-number v-model="dialogForm.returnQuantity" :min="1" style="width: 100%" />
@@ -103,9 +121,9 @@ import { QuestionFilled } from '@element-plus/icons-vue'
 import {
   createPurchaseReturnAPI,
   deletePurchaseReturnAPI,
-  getGoodsOptionsAPI,
   getPurchaseReturnDetailAPI,
   getPurchaseReturnPageAPI,
+  getReturnablePurchaseOptionsAPI,
   voidPurchaseReturnAPI
 } from '@/api/business'
 
@@ -114,17 +132,18 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const loading = ref(false)
-const goodsOptions = ref([])
+const sourcePurchaseOptions = ref([])
+const selectedSourcePurchase = ref(null)
 
 const tableData = ref([])
 
 const dialogVisible = ref(false)
 const dialogType = ref('add')
 const dialogFormRef = ref(null)
-const dialogForm = reactive({ goodsId: null, returnQuantity: 1, price: 0, returnDate: '', reason: '' })
+const dialogForm = reactive({ sourcePurchaseId: null, returnQuantity: 1, price: 0, returnDate: '', reason: '' })
 
 const dialogRules = {
-  goodsId: [{ required: true, message: '请选择商品', trigger: 'change' }],
+  sourcePurchaseId: [{ required: true, message: '请选择来源进货单', trigger: 'change' }],
   returnQuantity: [{ required: true, message: '请输入数量', trigger: 'blur' }],
   price: [{ required: true, message: '请输入退货单价', trigger: 'blur' }],
   returnDate: [{ required: true, message: '请选择退货日期', trigger: 'change' }]
@@ -147,14 +166,14 @@ const localToday = () => {
   const d = String(now.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
-
+// 允许删除
 const canDelete = (row) => {
   if (row?.__uiDeleted) return false
   if (row?.bizStatus !== 1) return false
   return toDateOnly(row?.returnDate) === localToday()
 }
-
-const canRedFlush = (row) => {
+// 允许作废
+const canVoid = (row) => {
   if (row?.__uiDeleted) return false
   if (row?.bizStatus !== 1) return false
   return toDateOnly(row?.returnDate) !== localToday()
@@ -167,12 +186,12 @@ const actionDisabledText = (row) => {
   if (row?.bizStatus === 1) return '已删除'
   return '不可操作'
 }
-
+// 构建后端所需的操作时间格式
 const buildOperationTime = (selectedDate) => {
   if (!selectedDate) return undefined
   return String(selectedDate).replace(' ', 'T')
 }
-
+// 前端记录是否保留
 const chooseFrontendRecordBehavior = async () => {
   try {
     await ElMessageBox.confirm('操作已完成，是否保留当前列表中的前端记录？', '前端记录处理', {
@@ -188,12 +207,19 @@ const chooseFrontendRecordBehavior = async () => {
   }
 }
 
-const loadGoodsOptions = async () => {
-  const res = await getGoodsOptionsAPI()
+const loadSourcePurchaseOptions = async () => {
+  const res = await getReturnablePurchaseOptionsAPI()
   if (res.code !== 200) {
-    throw new Error(res.msg || '加载商品下拉失败')
+    throw new Error(res.msg || '加载来源进货单失败')
   }
-  goodsOptions.value = res.data || []
+  sourcePurchaseOptions.value = res.data || []
+}
+
+const handleSourcePurchaseChange = (sourcePurchaseId) => {
+  selectedSourcePurchase.value = sourcePurchaseOptions.value.find((item) => item.id === sourcePurchaseId) || null
+  if (dialogType.value === 'add' && selectedSourcePurchase.value) {
+    dialogForm.price = Number(selectedSourcePurchase.value.unitPrice || 0)
+  }
 }
 
 const loadList = async () => {
@@ -202,8 +228,7 @@ const loadList = async () => {
     const params = {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
-      returnNo: searchForm.keywords || undefined,
-      goodsName: searchForm.keywords || undefined
+      returnNo: searchForm.keywords || undefined
     }
     const res = await getPurchaseReturnPageAPI(params)
     if (res.code !== 200) {
@@ -221,36 +246,38 @@ const loadList = async () => {
     loading.value = false
   }
 }
-
+// 搜索
 const handleSearch = () => {
   currentPage.value = 1
   loadList()
 }
-
+// 重置搜索
 const resetSearch = () => {
   searchForm.keywords = ''
   currentPage.value = 1
   loadList()
 }
-
+// 分页大小改变
 const handleSizeChange = (val) => {
   pageSize.value = val
   currentPage.value = 1
   loadList()
 }
-
+// 当前页改变
 const handleCurrentChange = (val) => {
   currentPage.value = val
   loadList()
 }
-
+// 新增退货单
 const handleAdd = () => {
   dialogType.value = 'add'
   dialogFormRef.value?.clearValidate()
-  Object.assign(dialogForm, { goodsId: null, returnQuantity: 1, price: 0, returnDate: '', reason: '' })
+  selectedSourcePurchase.value = null
+  // 重置表单数据
+  Object.assign(dialogForm, { sourcePurchaseId: null, returnQuantity: 1, price: 0, returnDate: '', reason: '' })
   dialogVisible.value = true
 }
-
+// 查看退货单详情
 const handleView = async (row) => {
   try {
     const res = await getPurchaseReturnDetailAPI(row.id)
@@ -259,8 +286,14 @@ const handleView = async (row) => {
     }
     const detail = res.data || {}
     dialogType.value = 'view'
+    selectedSourcePurchase.value = {
+      id: detail.sourcePurchaseId,
+      purchaseNo: detail.sourcePurchaseNo,
+      goodsName: detail.goodsName,
+      returnableQuantity: detail.returnQuantity
+    }
     Object.assign(dialogForm, {
-      goodsId: detail.goodsId ?? null,
+      sourcePurchaseId: detail.sourcePurchaseId ?? null,
       returnQuantity: detail.returnQuantity ?? detail.quantity ?? 1,
       price: detail.unitPrice ?? (detail.returnAmount && detail.quantity ? Number(detail.returnAmount) / Number(detail.quantity) : 0),
       returnDate: normalizeDateTime(detail.returnDate),
@@ -280,6 +313,7 @@ const handleDelete = (row) => {
     }
     ElMessage.success('删除成功')
     const behavior = await chooseFrontendRecordBehavior()
+    // 用户选择移除前端记录，则直接从列表中删除，否则标记为已删除
     if (behavior === 'remove') {
       tableData.value = tableData.value.filter((item) => item.id !== row.id)
       return
@@ -291,7 +325,7 @@ const handleDelete = (row) => {
     }
   })
 }
-
+// 作废单据（可选红冲）
 const handleVoid = async (row, createRedFlush) => {
   try {
     const title = createRedFlush ? '作废并红冲' : '作废单据'
@@ -330,8 +364,11 @@ const submitForm = () => {
       return
     }
     try {
+      if (selectedSourcePurchase.value && dialogForm.returnQuantity > selectedSourcePurchase.value.returnableQuantity) {
+        throw new Error(`退货数量超出可退数量，最多可退 ${selectedSourcePurchase.value.returnableQuantity}`)
+      }
       const payload = {
-        goodsId: dialogForm.goodsId,
+        sourcePurchaseId: dialogForm.sourcePurchaseId,
         quantity: dialogForm.returnQuantity,
         unitPrice: Number(dialogForm.price),
         operationTime: buildOperationTime(dialogForm.returnDate),
@@ -343,6 +380,7 @@ const submitForm = () => {
       }
       ElMessage.success('退货开单成功')
       dialogVisible.value = false
+      await loadSourcePurchaseOptions()
       loadList()
     } catch (error) {
       ElMessage.error(error.message || '新增失败')
@@ -352,7 +390,7 @@ const submitForm = () => {
 
 onMounted(async () => {
   try {
-    await loadGoodsOptions()
+    await loadSourcePurchaseOptions()
     await loadList()
   } catch (error) {
     ElMessage.error(error.message || '初始化失败')

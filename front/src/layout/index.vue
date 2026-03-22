@@ -5,7 +5,7 @@
       <el-menu background-color="#304156" text-color="#fff" router :default-active="$route.path">
         <el-menu-item index="/home">首页</el-menu-item>
         
-        <!-- 基础资料菜单，包含供应商和商品，所有角色都可见（普通员工用于查阅） -->
+        <!-- 基础资料菜单，包含供应商和商品，所有角色都可见 -->
         <el-sub-menu index="/base">
           <template #title>基础资料</template>
           <el-menu-item index="/base/supplier">供应商管理</el-menu-item>
@@ -21,13 +21,13 @@
           <el-menu-item index="/business/sales-return">销售退货单</el-menu-item>
         </el-sub-menu>
 
-        <!-- 统计报表菜单，仅管理员可见 -->
+        <!-- 统计报表菜单，仅管理员/超级管理员可见 -->
         <el-sub-menu index="/statistics" v-if="userStore.role === 'admin' || userStore.role === 'superadmin'">
           <template #title>统计报表</template>
           <el-menu-item index="/business/sales-chart">销售统计图表</el-menu-item>
         </el-sub-menu>
 
-        <!-- 管理员专属菜单，根据全局状态 role 控制是否挂载渲染 -->
+        <!-- 管理员/超级管理员专属菜单，根据 role 控制 -->
         <el-sub-menu index="/system" v-if="userStore.role === 'admin' || userStore.role === 'superadmin'">
           <template #title>系统管理</template>
           <el-menu-item index="/system/notice">公告管理</el-menu-item>

@@ -3,14 +3,14 @@
     <el-card>
       <div class="search-box">
         <div class="top-right-help">
-          <span class="help-label">作废红冲:</span>
-          <el-tooltip content="作废红冲：保留原单并生成反向红字记录，便于审计追溯。" placement="left">
+          <span class="help-label">作废/红冲:</span>
+          <el-tooltip content="仅作废：撤销业务并回滚库存；作废并红冲：额外生成红冲单用于审计追溯。" placement="left">
             <el-icon class="void-help-icon"><QuestionFilled /></el-icon>
           </el-tooltip>
         </div>
         <el-form :inline="true" :model="searchForm">
-          <el-form-item label="商品/单号">
-            <el-input v-model="searchForm.keywords" placeholder="请输入商品名称或销售单号" clearable></el-input>
+          <el-form-item label="销售单号">
+            <el-input v-model="searchForm.keywords" placeholder="请输入销售单号" clearable></el-input>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleSearch">查询</el-button>
@@ -30,15 +30,16 @@
         <el-table-column prop="totalAmount" label="销售总额(元)" width="120" />
         <el-table-column prop="salesDate" label="销售日期" width="180" />
         <el-table-column prop="operator" label="操作人" width="100" />
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="scope">
             <div class="action-group">
               <el-button size="small" type="primary" link @click="handleView(scope.row)">明细</el-button>
               <template v-if="canDelete(scope.row)">
                 <el-button v-permission="['admin']" size="small" type="danger" link @click="handleDelete(scope.row)">删除</el-button>
               </template>
-              <template v-else-if="canRedFlush(scope.row)">
-                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废红冲</el-button>
+              <template v-else-if="canVoid(scope.row)">
+                <el-button v-permission="['admin']" size="small" type="warning" link @click="handleVoid(scope.row, false)">仅作废</el-button>
+                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废并红冲</el-button>
               </template>
               <span v-else class="action-disabled">{{ actionDisabledText(scope.row) }}</span>
             </div>
@@ -164,7 +165,7 @@ const canDelete = (row) => {
   return toDateOnly(row?.salesDate) === localToday()
 }
 
-const canRedFlush = (row) => {
+const canVoid = (row) => {
   if (row?.__uiDeleted) return false
   if (row?.bizStatus !== 1) return false
   return toDateOnly(row?.salesDate) !== localToday()
@@ -212,8 +213,7 @@ const loadList = async () => {
     const params = {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
-      salesNo: searchForm.keywords || undefined,
-      goodsName: searchForm.keywords || undefined
+      salesNo: searchForm.keywords || undefined
     }
     const res = await getSalesPageAPI(params)
     if (res.code !== 200) {

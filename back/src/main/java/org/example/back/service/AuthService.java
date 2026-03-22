@@ -157,10 +157,6 @@ public class AuthService {
         if (role == null) {
             return "";
         }
-        String normalized = role.trim().toLowerCase();
-        if ("super_admin".equals(normalized)) {
-            return ROLE_superadmin;
-        }
-        return normalized;
+        return role.trim().toLowerCase();
     }
 }

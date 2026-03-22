@@ -205,11 +205,13 @@ CREATE TABLE `biz_purchase` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='进货表';
 
 -- 3.2 退货表 (biz_purchase_return)
--- 记录商品退给供应商的信息，库存减少
+-- 记录商品退给供应商的信息，库存减少；支持关联来源进货单
 DROP TABLE IF EXISTS `biz_purchase_return`;
 CREATE TABLE `biz_purchase_return` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `return_no` VARCHAR(30) NOT NULL COMMENT '退货单号',
+    `source_purchase_id` BIGINT DEFAULT NULL COMMENT '来源进货单ID',
+    `source_purchase_no` VARCHAR(30) DEFAULT NULL COMMENT '来源进货单号',
     `goods_id` BIGINT NOT NULL COMMENT '商品ID',
     `goods_name` VARCHAR(100) DEFAULT NULL COMMENT '商品名称(冗余字段)',
     `quantity` INT NOT NULL COMMENT '退货数量',
@@ -228,6 +230,8 @@ CREATE TABLE `biz_purchase_return` (
     `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_return_no` (`return_no`),
+    KEY `idx_source_purchase_id` (`source_purchase_id`),
+    KEY `idx_source_purchase_no` (`source_purchase_no`),
     KEY `idx_goods_id` (`goods_id`),
     KEY `idx_goods_time` (`goods_id`, `operation_time`),
     KEY `idx_biz_status` (`biz_status`),
@@ -276,6 +280,8 @@ DROP TABLE IF EXISTS `biz_sales_return`;
 CREATE TABLE `biz_sales_return` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `return_no` VARCHAR(30) NOT NULL COMMENT '退货单号',
+    `source_sales_id` BIGINT DEFAULT NULL COMMENT '来源销售单ID',
+    `source_sales_no` VARCHAR(30) DEFAULT NULL COMMENT '来源销售单号',
     `goods_id` BIGINT NOT NULL COMMENT '商品ID',
     `goods_name` VARCHAR(100) DEFAULT NULL COMMENT '商品名称(冗余字段)',
     `quantity` INT NOT NULL COMMENT '退货数量',
@@ -296,6 +302,8 @@ CREATE TABLE `biz_sales_return` (
     UNIQUE KEY `uk_return_no` (`return_no`),
     KEY `idx_goods_id` (`goods_id`),
     KEY `idx_goods_time` (`goods_id`, `operation_time`),
+    KEY `idx_source_sales_id` (`source_sales_id`),
+    KEY `idx_source_sales_no` (`source_sales_no`),
     KEY `idx_biz_status` (`biz_status`),
     KEY `idx_source_id` (`source_id`),
     KEY `idx_operator_id` (`operator_id`),
@@ -308,10 +316,11 @@ CREATE TABLE `biz_sales_return` (
 -- =============================================
 
 -- 4.1 初始化管理员账号
--- 用户名: admin / superadmin / employee, 密码均为 123456
+-- 用户名: admin / superadmin / employee / lisi, 密码均为 123456
 INSERT INTO `sys_user` (`id`, `username`, `password`, `real_name`, `role`, `status`, `phone`, `email`) VALUES
 (1, 'admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '系统管理员', 'admin', 1, '13800138000', 'admin@warehouse.com'),
 (2, 'employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '普通员工', 'employee', 1, '13900139000', 'employee@warehouse.com'),
+(4, 'lisi', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', 1, '13600136000', 'lisi@warehouse.com'),
 (5, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', 1, '13700137000', 'superadmin@warehouse.com');
 
 -- 4.2 初始化部门数据
@@ -372,9 +381,9 @@ INSERT INTO `biz_purchase` (`purchase_no`, `goods_id`, `goods_name`, `quantity`,
 ('PUR202503005', 2, '电容100uF', 100, 1.0, 100.00, 1, '系统管理员', '2025-03-08 11:30:00', '补货');
 
 -- 4.7 初始化退货记录 (商品退给供应商)
-INSERT INTO `biz_purchase_return` (`return_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
-('RET202501001', 1, '电阻10K', 20, 0.5, 10.00, 1, '系统管理员', '2025-01-20 10:00:00', '质量问题退货'),
-('RET202502001', 2, '电容100uF', 15, 1.0, 15.00, 1, '系统管理员', '2025-02-15 10:00:00', '质量问题退货');
+INSERT INTO `biz_purchase_return` (`return_no`, `source_purchase_id`, `source_purchase_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
+('RET202501001', 1, 'PUR202501001', 1, '电阻10K', 20, 0.5, 10.00, 1, '系统管理员', '2025-01-20 10:00:00', '质量问题退货'),
+('RET202502001', 2, 'PUR202501002', 2, '电容100uF', 15, 1.0, 15.00, 1, '系统管理员', '2025-02-15 10:00:00', '质量问题退货');
 
 -- 4.8 初始化销售记录
 INSERT INTO `biz_sales` (`sales_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
@@ -398,10 +407,10 @@ INSERT INTO `biz_sales` (`sales_no`, `goods_id`, `goods_name`, `quantity`, `unit
 ('SAL202503008', 7, '三星24英寸显示器', 15, 1299.0, 19485.00, 4, '李四', '2025-03-10 10:00:00', '正常销售');
 
 -- 4.9 初始化客退记录 (客户退货)
-INSERT INTO `biz_sales_return` (`return_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
-('CSTRET202501001', 3, '华为Mate60', 1, 5999.0, 5999.00, 4, '李四', '2025-01-20 10:00:00', '质量问题退货'),
-('CSTRET202501002', 4, '小米14 Pro', 1, 4999.0, 4999.00, 4, '李四', '2025-01-20 11:00:00', '质量问题退货'),
-('CSTRET202502001', 8, '华为FreeBuds', 2, 499.0, 998.00, 4, '李四', '2025-02-20 10:00:00', '客户退货');
+INSERT INTO `biz_sales_return` (`return_no`, `source_sales_id`, `source_sales_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
+('CSTRET202501001', 1, 'SAL202501001', 3, '华为Mate60', 1, 5999.0, 5999.00, 4, '李四', '2025-01-20 10:00:00', '质量问题退货'),
+('CSTRET202501002', 2, 'SAL202501002', 4, '小米14 Pro', 1, 4999.0, 4999.00, 4, '李四', '2025-01-20 11:00:00', '质量问题退货'),
+('CSTRET202502001', 5, 'SAL202501005', 8, '华为FreeBuds', 2, 499.0, 998.00, 4, '李四', '2025-02-20 10:00:00', '客户退货');
 
 -- 4.10 初始化公告数据
 INSERT INTO `sys_notice` (`title`, `content`, `publisher`, `publish_time`, `status`) VALUES

@@ -12,6 +12,10 @@ public class PurchaseReturnVO {
 
     private String returnNo;
 
+    private Long sourcePurchaseId;
+
+    private String sourcePurchaseNo;
+
     private String orderNo;
 
     private Long goodsId;

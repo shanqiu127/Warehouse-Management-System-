@@ -9,9 +9,12 @@ import org.example.back.dto.PurchaseQueryDTO;
 import org.example.back.dto.PurchaseSaveDTO;
 import org.example.back.dto.DocumentVoidDTO;
 import org.example.back.service.PurchaseService;
+import org.example.back.vo.PurchaseSourceOptionVO;
 import org.example.back.vo.PurchaseVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/business/purchases")
@@ -28,6 +31,11 @@ public class PurchaseController {
     @GetMapping("/{id}")
     public Result<PurchaseVO> getById(@PathVariable Long id) {
         return Result.success(purchaseService.getById(id));
+    }
+
+    @GetMapping("/options/returnable")
+    public Result<List<PurchaseSourceOptionVO>> returnableOptions(@RequestParam(required = false) Long goodsId) {
+        return Result.success(purchaseService.returnableOptions(goodsId));
     }
 
     @PostMapping

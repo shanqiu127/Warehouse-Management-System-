@@ -11,8 +11,10 @@ import org.example.back.dto.DocumentVoidDTO;
 import org.example.back.dto.SalesReturnQueryDTO;
 import org.example.back.dto.SalesReturnSaveDTO;
 import org.example.back.entity.BaseGoods;
+import org.example.back.entity.BizSales;
 import org.example.back.entity.BizSalesReturn;
 import org.example.back.mapper.BaseGoodsMapper;
+import org.example.back.mapper.BizSalesMapper;
 import org.example.back.mapper.BizSalesReturnMapper;
 import org.example.back.vo.SalesReturnVO;
 import org.springframework.beans.BeanUtils;
@@ -34,6 +36,9 @@ public class SalesReturnService {
 
     @Autowired
     private BaseGoodsMapper baseGoodsMapper;
+
+    @Autowired
+    private BizSalesMapper bizSalesMapper;
 
     @Autowired
     private AuthService authService;
@@ -64,15 +69,21 @@ public class SalesReturnService {
     public void create(SalesReturnSaveDTO dto) {
         validateQuantity(dto.getQuantity());
 
-        BaseGoods goods = requireGoods(dto.getGoodsId());
+        BizSales sourceSales = requireSourceSales(dto.getSourceSalesId());
+        ensureSourceSalesNormal(sourceSales);
+        validateReturnableQuantity(sourceSales, dto.getQuantity());
+
+        BaseGoods goods = requireGoods(sourceSales.getGoodsId());
         ensureGoodsEnabled(goods);
-        BigDecimal unitPrice = resolveUnitPrice(dto.getUnitPrice(), goods.getSalePrice(), "商品售价为空，请传入客退单价");
+        BigDecimal unitPrice = resolveUnitPrice(dto.getUnitPrice(), sourceSales.getUnitPrice(), "来源销售单缺少单价，请传入客退单价");
         LocalDateTime operationTime = dto.getOperationTime() == null ? LocalDateTime.now() : dto.getOperationTime();
 
         LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
 
         BizSalesReturn entity = new BizSalesReturn();
         entity.setReturnNo(CodeGenerator.salesReturnNo());
+        entity.setSourceSalesId(sourceSales.getId());
+        entity.setSourceSalesNo(sourceSales.getSalesNo());
         entity.setGoodsId(goods.getId());
         entity.setGoodsName(goods.getGoodsName());
         entity.setQuantity(dto.getQuantity());
@@ -101,7 +112,6 @@ public class SalesReturnService {
     public void voidDocument(Long id, DocumentVoidDTO dto) {
         BizSalesReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "客退单");
-        validateHistoricalRedFlushOnly(entity.getOperationTime(), dto, "客退单");
 
         decreaseStock(entity.getGoodsId(), entity.getQuantity(), "当前库存不足，无法作废该客退单");
 
@@ -116,6 +126,8 @@ public class SalesReturnService {
             LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
             BizSalesReturn redFlushDoc = new BizSalesReturn();
             redFlushDoc.setReturnNo(CodeGenerator.salesReturnNo());
+            redFlushDoc.setSourceSalesId(entity.getSourceSalesId());
+            redFlushDoc.setSourceSalesNo(entity.getSourceSalesNo());
             redFlushDoc.setGoodsId(entity.getGoodsId());
             redFlushDoc.setGoodsName(entity.getGoodsName());
             redFlushDoc.setQuantity(-entity.getQuantity());
@@ -148,6 +160,35 @@ public class SalesReturnService {
         return goods;
     }
 
+    private BizSales requireSourceSales(Long sourceSalesId) {
+        BizSales sales = bizSalesMapper.selectById(sourceSalesId);
+        if (sales == null) {
+            throw BusinessException.validateFail("来源销售单不存在");
+        }
+        return sales;
+    }
+
+    private void ensureSourceSalesNormal(BizSales sourceSales) {
+        if (sourceSales.getBizStatus() == null || sourceSales.getBizStatus() != 1) {
+            throw BusinessException.validateFail("来源销售单非正常状态，禁止退货");
+        }
+    }
+
+    private void validateReturnableQuantity(BizSales sourceSales, Integer returnQty) {
+        LambdaQueryWrapper<BizSalesReturn> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizSalesReturn::getSourceSalesId, sourceSales.getId())
+                .eq(BizSalesReturn::getBizStatus, 1);
+        List<BizSalesReturn> linkedReturns = bizSalesReturnMapper.selectList(wrapper);
+        int returnedQty = linkedReturns.stream().map(BizSalesReturn::getQuantity).reduce(0, Integer::sum);
+        int availableQty = sourceSales.getQuantity() - returnedQty;
+        if (availableQty <= 0) {
+            throw BusinessException.validateFail("来源销售单已无可退数量");
+        }
+        if (returnQty > availableQty) {
+            throw BusinessException.validateFail("退货数量超出可退数量，当前最多可退: " + availableQty);
+        }
+    }
+
     private void ensureGoodsEnabled(BaseGoods goods) {
         if (goods.getStatus() == null || goods.getStatus() != 1) {
             throw BusinessException.validateFail("商品已下架，无法创建业务单据");
@@ -171,17 +212,6 @@ public class SalesReturnService {
             throw BusinessException.validateFail(docName + "已作废，禁止重复操作");
         }
         throw BusinessException.validateFail(docName + "为红冲单，禁止删除或再次作废");
-    }
-
-    private void validateHistoricalRedFlushOnly(LocalDateTime operationTime, DocumentVoidDTO dto, String docName) {
-        if (operationTime == null) {
-            return;
-        }
-        boolean isToday = operationTime.toLocalDate().equals(LocalDate.now());
-        boolean createRedFlush = dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush());
-        if (!isToday && !createRedFlush) {
-            throw BusinessException.validateFail("历史" + docName + "仅支持作废红冲");
-        }
     }
 
     private String normalizeReason(String reason) {
@@ -232,6 +262,9 @@ public class SalesReturnService {
     private SalesReturnVO toVO(BizSalesReturn entity) {
         SalesReturnVO vo = new SalesReturnVO();
         BeanUtils.copyProperties(entity, vo);
+        vo.setSourceSalesId(entity.getSourceSalesId());
+        vo.setSourceSalesNo(entity.getSourceSalesNo());
+        vo.setOrderNo(entity.getSourceSalesNo());
         vo.setRefundAmount(entity.getTotalPrice());
         vo.setReturnDate(entity.getOperationTime());
         vo.setOperator(entity.getOperatorName());

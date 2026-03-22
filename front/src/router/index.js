@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router"
+import { ElMessage } from "element-plus"
 import { getRole, getToken, hasRole } from "@/utils/auth"
 
 const router = createRouter({
@@ -56,14 +57,14 @@ const router = createRouter({
           name: "BusinessSalesReturn",
           component: () => import("../views/business/SalesReturnView.vue")
         },
-        // 统计图表页面（仅管理员可用）
+        // 统计图表页面
         {
           path: "business/sales-chart",
           name: "BusinessSalesChart",
           component: () => import("../views/business/SalesChartView.vue"),
           meta: { roles: ['admin', 'superadmin'] } 
         },
-        // 以下为动态权限测试页面（仅管理员可用）
+        // 以下为动态权限测试页面
         {
           path: "system/notice",
           name: "SystemNotice",
@@ -94,7 +95,7 @@ const router = createRouter({
     {
       path: "/403",
       name: "Forbidden",
-      component: () => import("../views/HomeView.vue") // 暂时使用首页替代演示，或者你可以单独建一个 403 页面
+      component: () => import("../views/ForbiddenView.vue")
     }
   ]
 })
@@ -113,8 +114,8 @@ router.beforeEach((to, from, next) => {
       if (to.meta && to.meta.roles) {
         const allowRoles = to.meta.roles
         if (!hasRole(role, allowRoles)) {
-          // 角色不匹配，无权限访问该页面
-          return next('/403') // 实际开发可结合 ElMessage 提示并跳转无权限页
+          ElMessage.error('无权限访问该页面')
+          return next('/403')
         }
       }
       return next()

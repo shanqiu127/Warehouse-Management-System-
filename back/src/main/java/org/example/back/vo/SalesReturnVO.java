@@ -12,7 +12,11 @@ public class SalesReturnVO {
 
     private String returnNo;
 
-    private String salesNo;
+    private Long sourceSalesId;
+
+    private String sourceSalesNo;
+
+    private String orderNo;
 
     private Long goodsId;
 

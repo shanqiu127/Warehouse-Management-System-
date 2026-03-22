@@ -85,8 +85,7 @@ const noticeDialogVisible = ref(false)
 const noticeDetail = ref({ title: '', date: '', author: '', content: '' })
 
 const normalizeRole = (role) => {
-  const normalized = String(role || '').trim().toLowerCase()
-  return normalized === 'super_admin' ? 'superadmin' : normalized
+  return String(role || '').trim().toLowerCase()
 }
 
 const roleLabel = (role) => {

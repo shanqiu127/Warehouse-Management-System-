@@ -12,8 +12,11 @@ import org.example.back.dto.SalesQueryDTO;
 import org.example.back.dto.SalesSaveDTO;
 import org.example.back.entity.BaseGoods;
 import org.example.back.entity.BizSales;
+import org.example.back.entity.BizSalesReturn;
 import org.example.back.mapper.BaseGoodsMapper;
 import org.example.back.mapper.BizSalesMapper;
+import org.example.back.mapper.BizSalesReturnMapper;
+import org.example.back.vo.SalesSourceOptionVO;
 import org.example.back.vo.SalesVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +27,9 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class SalesService {
@@ -34,6 +39,9 @@ public class SalesService {
 
     @Autowired
     private BaseGoodsMapper baseGoodsMapper;
+
+    @Autowired
+    private BizSalesReturnMapper bizSalesReturnMapper;
 
     @Autowired
     private AuthService authService;
@@ -58,6 +66,51 @@ public class SalesService {
     public SalesVO getById(Long id) {
         BizSales entity = requireEntity(id);
         return toVO(entity);
+    }
+
+    public List<SalesSourceOptionVO> returnableOptions(Long goodsId) {
+        LambdaQueryWrapper<BizSales> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizSales::getBizStatus, 1)
+                .eq(goodsId != null, BizSales::getGoodsId, goodsId)
+                .orderByDesc(BizSales::getOperationTime)
+                .orderByDesc(BizSales::getId);
+        List<BizSales> salesList = bizSalesMapper.selectList(wrapper);
+        if (salesList.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> salesIds = salesList.stream().map(BizSales::getId).toList();
+        LambdaQueryWrapper<BizSalesReturn> returnWrapper = new LambdaQueryWrapper<>();
+        returnWrapper.in(BizSalesReturn::getSourceSalesId, salesIds)
+                .eq(BizSalesReturn::getBizStatus, 1);
+        List<BizSalesReturn> linkedReturns = bizSalesReturnMapper.selectList(returnWrapper);
+
+        Map<Long, Integer> returnedMap = new HashMap<>();
+        for (BizSalesReturn item : linkedReturns) {
+            returnedMap.merge(item.getSourceSalesId(), item.getQuantity(), Integer::sum);
+        }
+
+        return salesList.stream()
+                .map(item -> {
+                    int returnedQty = returnedMap.getOrDefault(item.getId(), 0);
+                    int returnableQty = item.getQuantity() - returnedQty;
+                    if (returnableQty <= 0) {
+                        return null;
+                    }
+                    SalesSourceOptionVO vo = new SalesSourceOptionVO();
+                    vo.setId(item.getId());
+                    vo.setSalesNo(item.getSalesNo());
+                    vo.setGoodsId(item.getGoodsId());
+                    vo.setGoodsName(item.getGoodsName());
+                    vo.setQuantity(item.getQuantity());
+                    vo.setReturnedQuantity(returnedQty);
+                    vo.setReturnableQuantity(returnableQty);
+                    vo.setUnitPrice(item.getUnitPrice());
+                    vo.setOperationTime(item.getOperationTime());
+                    return vo;
+                })
+                .filter(item -> item != null)
+                .toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -101,7 +154,6 @@ public class SalesService {
     public void voidDocument(Long id, DocumentVoidDTO dto) {
         BizSales entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "销售单");
-        validateHistoricalRedFlushOnly(entity.getOperationTime(), dto, "销售单");
 
         increaseStock(entity.getGoodsId(), entity.getQuantity());
 
@@ -171,17 +223,6 @@ public class SalesService {
             throw BusinessException.validateFail(docName + "已作废，禁止重复操作");
         }
         throw BusinessException.validateFail(docName + "为红冲单，禁止删除或再次作废");
-    }
-
-    private void validateHistoricalRedFlushOnly(LocalDateTime operationTime, DocumentVoidDTO dto, String docName) {
-        if (operationTime == null) {
-            return;
-        }
-        boolean isToday = operationTime.toLocalDate().equals(LocalDate.now());
-        boolean createRedFlush = dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush());
-        if (!isToday && !createRedFlush) {
-            throw BusinessException.validateFail("历史" + docName + "仅支持作废红冲");
-        }
     }
 
     private String normalizeReason(String reason) {

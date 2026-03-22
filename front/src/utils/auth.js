@@ -2,11 +2,7 @@ const TOKEN_KEY = "token"
 const ROLE_KEY = "role"
 
 const normalizeRole = (role) => {
-  const normalized = String(role || "").trim().toLowerCase()
-  if (normalized === "super_admin") {
-    return "superadmin"
-  }
-  return normalized
+  return String(role || "").trim().toLowerCase()
 }
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY) || ""

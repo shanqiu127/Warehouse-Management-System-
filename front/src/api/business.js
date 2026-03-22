@@ -4,6 +4,7 @@ export const getGoodsOptionsAPI = () => request.get('/base/goods/options')
 
 export const getPurchasePageAPI = (params) => request.get('/business/purchases/page', { params })
 export const getPurchaseDetailAPI = (id) => request.get(`/business/purchases/${id}`)
+export const getReturnablePurchaseOptionsAPI = (params) => request.get('/business/purchases/options/returnable', { params })
 export const createPurchaseAPI = (data) => request.post('/business/purchases', data)
 export const deletePurchaseAPI = (id) => request.delete(`/business/purchases/${id}`)
 export const voidPurchaseAPI = (id, data) => request.put(`/business/purchases/${id}/void`, data)
@@ -16,6 +17,7 @@ export const voidPurchaseReturnAPI = (id, data) => request.put(`/business/purcha
 
 export const getSalesPageAPI = (params) => request.get('/business/sales/page', { params })
 export const getSalesDetailAPI = (id) => request.get(`/business/sales/${id}`)
+export const getReturnableSalesOptionsAPI = (params) => request.get('/business/sales/options/returnable', { params })
 export const createSalesAPI = (data) => request.post('/business/sales', data)
 export const deleteSalesAPI = (id) => request.delete(`/business/sales/${id}`)
 export const voidSalesAPI = (id, data) => request.put(`/business/sales/${id}/void`, data)

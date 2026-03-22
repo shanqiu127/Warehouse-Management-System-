@@ -12,9 +12,11 @@ import org.example.back.dto.PurchaseReturnQueryDTO;
 import org.example.back.dto.PurchaseReturnSaveDTO;
 import org.example.back.entity.BaseGoods;
 import org.example.back.entity.BaseSupplier;
+import org.example.back.entity.BizPurchase;
 import org.example.back.entity.BizPurchaseReturn;
 import org.example.back.mapper.BaseGoodsMapper;
 import org.example.back.mapper.BaseSupplierMapper;
+import org.example.back.mapper.BizPurchaseMapper;
 import org.example.back.mapper.BizPurchaseReturnMapper;
 import org.example.back.vo.PurchaseReturnVO;
 import org.springframework.beans.BeanUtils;
@@ -37,6 +39,9 @@ public class PurchaseReturnService {
 
     @Autowired
     private BizPurchaseReturnMapper bizPurchaseReturnMapper;
+
+    @Autowired
+    private BizPurchaseMapper bizPurchaseMapper;
 
     @Autowired
     private BaseGoodsMapper baseGoodsMapper;
@@ -88,15 +93,20 @@ public class PurchaseReturnService {
     public void create(PurchaseReturnSaveDTO dto) {
         validateQuantity(dto.getQuantity());
 
-        BaseGoods goods = requireGoods(dto.getGoodsId());
-        ensureGoodsEnabled(goods);
-        BigDecimal unitPrice = resolveUnitPrice(dto.getUnitPrice(), goods.getPurchasePrice(), "商品进价为空，请传入退货单价");
+        BizPurchase sourcePurchase = requireSourcePurchase(dto.getSourcePurchaseId());
+        ensureSourcePurchaseNormal(sourcePurchase);
+        validateReturnableQuantity(sourcePurchase, dto.getQuantity());
+
+        BaseGoods goods = requireGoods(sourcePurchase.getGoodsId());
+        BigDecimal unitPrice = resolveUnitPrice(dto.getUnitPrice(), sourcePurchase.getUnitPrice(), "来源进货单缺少单价，请传入退货单价");
         LocalDateTime operationTime = dto.getOperationTime() == null ? LocalDateTime.now() : dto.getOperationTime();
 
         LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
 
         BizPurchaseReturn entity = new BizPurchaseReturn();
         entity.setReturnNo(CodeGenerator.purchaseReturnNo());
+        entity.setSourcePurchaseId(sourcePurchase.getId());
+        entity.setSourcePurchaseNo(sourcePurchase.getPurchaseNo());
         entity.setGoodsId(goods.getId());
         entity.setGoodsName(goods.getGoodsName());
         entity.setQuantity(dto.getQuantity());
@@ -125,7 +135,6 @@ public class PurchaseReturnService {
     public void voidDocument(Long id, DocumentVoidDTO dto) {
         BizPurchaseReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "进货退货单");
-        validateHistoricalRedFlushOnly(entity.getOperationTime(), dto, "进货退货单");
 
         increaseStock(entity.getGoodsId(), entity.getQuantity());
 
@@ -140,6 +149,8 @@ public class PurchaseReturnService {
             LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
             BizPurchaseReturn redFlushDoc = new BizPurchaseReturn();
             redFlushDoc.setReturnNo(CodeGenerator.purchaseReturnNo());
+            redFlushDoc.setSourcePurchaseId(entity.getSourcePurchaseId());
+            redFlushDoc.setSourcePurchaseNo(entity.getSourcePurchaseNo());
             redFlushDoc.setGoodsId(entity.getGoodsId());
             redFlushDoc.setGoodsName(entity.getGoodsName());
             redFlushDoc.setQuantity(-entity.getQuantity());
@@ -172,9 +183,32 @@ public class PurchaseReturnService {
         return goods;
     }
 
-    private void ensureGoodsEnabled(BaseGoods goods) {
-        if (goods.getStatus() == null || goods.getStatus() != 1) {
-            throw BusinessException.validateFail("商品已下架，无法创建业务单据");
+    private BizPurchase requireSourcePurchase(Long sourcePurchaseId) {
+        BizPurchase purchase = bizPurchaseMapper.selectById(sourcePurchaseId);
+        if (purchase == null) {
+            throw BusinessException.validateFail("来源进货单不存在");
+        }
+        return purchase;
+    }
+
+    private void ensureSourcePurchaseNormal(BizPurchase sourcePurchase) {
+        if (sourcePurchase.getBizStatus() == null || sourcePurchase.getBizStatus() != 1) {
+            throw BusinessException.validateFail("来源进货单非正常状态，禁止退货");
+        }
+    }
+
+    private void validateReturnableQuantity(BizPurchase sourcePurchase, Integer returnQty) {
+        LambdaQueryWrapper<BizPurchaseReturn> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizPurchaseReturn::getSourcePurchaseId, sourcePurchase.getId())
+                .eq(BizPurchaseReturn::getBizStatus, 1);
+        List<BizPurchaseReturn> linkedReturns = bizPurchaseReturnMapper.selectList(wrapper);
+        int returnedQty = linkedReturns.stream().map(BizPurchaseReturn::getQuantity).reduce(0, Integer::sum);
+        int availableQty = sourcePurchase.getQuantity() - returnedQty;
+        if (availableQty <= 0) {
+            throw BusinessException.validateFail("来源进货单已无可退数量");
+        }
+        if (returnQty > availableQty) {
+            throw BusinessException.validateFail("退货数量超出可退数量，当前最多可退: " + availableQty);
         }
     }
 
@@ -195,17 +229,6 @@ public class PurchaseReturnService {
             throw BusinessException.validateFail(docName + "已作废，禁止重复操作");
         }
         throw BusinessException.validateFail(docName + "为红冲单，禁止删除或再次作废");
-    }
-
-    private void validateHistoricalRedFlushOnly(LocalDateTime operationTime, DocumentVoidDTO dto, String docName) {
-        if (operationTime == null) {
-            return;
-        }
-        boolean isToday = operationTime.toLocalDate().equals(LocalDate.now());
-        boolean createRedFlush = dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush());
-        if (!isToday && !createRedFlush) {
-            throw BusinessException.validateFail("历史" + docName + "仅支持作废红冲");
-        }
     }
 
     private String normalizeReason(String reason) {
@@ -275,6 +298,9 @@ public class PurchaseReturnService {
         PurchaseReturnVO vo = new PurchaseReturnVO();
         BeanUtils.copyProperties(entity, vo);
         vo.setSupplierName(supplier == null ? null : supplier.getSupplierName());
+        vo.setSourcePurchaseId(entity.getSourcePurchaseId());
+        vo.setSourcePurchaseNo(entity.getSourcePurchaseNo());
+        vo.setOrderNo(entity.getSourcePurchaseNo());
         vo.setReturnQuantity(entity.getQuantity());
         vo.setReturnAmount(entity.getTotalPrice());
         vo.setReturnDate(entity.getOperationTime());

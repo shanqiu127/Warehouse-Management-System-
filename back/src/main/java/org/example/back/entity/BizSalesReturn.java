@@ -18,6 +18,10 @@ public class BizSalesReturn {
 
     private String returnNo;
 
+    private Long sourceSalesId;
+
+    private String sourceSalesNo;
+
     private Long goodsId;
 
     private String goodsName;

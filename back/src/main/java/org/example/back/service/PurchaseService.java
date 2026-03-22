@@ -13,9 +13,12 @@ import org.example.back.dto.PurchaseSaveDTO;
 import org.example.back.entity.BaseGoods;
 import org.example.back.entity.BaseSupplier;
 import org.example.back.entity.BizPurchase;
+import org.example.back.entity.BizPurchaseReturn;
 import org.example.back.mapper.BaseGoodsMapper;
 import org.example.back.mapper.BaseSupplierMapper;
 import org.example.back.mapper.BizPurchaseMapper;
+import org.example.back.mapper.BizPurchaseReturnMapper;
+import org.example.back.vo.PurchaseSourceOptionVO;
 import org.example.back.vo.PurchaseVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +47,9 @@ public class PurchaseService {
 
     @Autowired
     private BaseSupplierMapper baseSupplierMapper;
+
+    @Autowired
+    private BizPurchaseReturnMapper bizPurchaseReturnMapper;
 
     @Autowired
     private AuthService authService;
@@ -82,6 +89,51 @@ public class PurchaseService {
         BaseGoods goods = baseGoodsMapper.selectById(purchase.getGoodsId());
         BaseSupplier supplier = goods == null ? null : baseSupplierMapper.selectById(goods.getSupplierId());
         return toVO(purchase, supplier);
+    }
+
+    public List<PurchaseSourceOptionVO> returnableOptions(Long goodsId) {
+        LambdaQueryWrapper<BizPurchase> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizPurchase::getBizStatus, 1)
+                .eq(goodsId != null, BizPurchase::getGoodsId, goodsId)
+                .orderByDesc(BizPurchase::getOperationTime)
+                .orderByDesc(BizPurchase::getId);
+        List<BizPurchase> purchases = bizPurchaseMapper.selectList(wrapper);
+        if (purchases.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> purchaseIds = purchases.stream().map(BizPurchase::getId).toList();
+        LambdaQueryWrapper<BizPurchaseReturn> returnWrapper = new LambdaQueryWrapper<>();
+        returnWrapper.in(BizPurchaseReturn::getSourcePurchaseId, purchaseIds)
+                .eq(BizPurchaseReturn::getBizStatus, 1);
+        List<BizPurchaseReturn> linkedReturns = bizPurchaseReturnMapper.selectList(returnWrapper);
+
+        Map<Long, Integer> returnedMap = new HashMap<>();
+        for (BizPurchaseReturn item : linkedReturns) {
+            returnedMap.merge(item.getSourcePurchaseId(), item.getQuantity(), Integer::sum);
+        }
+
+        return purchases.stream()
+                .map(item -> {
+                    int returnedQty = returnedMap.getOrDefault(item.getId(), 0);
+                    int returnableQty = item.getQuantity() - returnedQty;
+                    if (returnableQty <= 0) {
+                        return null;
+                    }
+                    PurchaseSourceOptionVO vo = new PurchaseSourceOptionVO();
+                    vo.setId(item.getId());
+                    vo.setPurchaseNo(item.getPurchaseNo());
+                    vo.setGoodsId(item.getGoodsId());
+                    vo.setGoodsName(item.getGoodsName());
+                    vo.setQuantity(item.getQuantity());
+                    vo.setReturnedQuantity(returnedQty);
+                    vo.setReturnableQuantity(returnableQty);
+                    vo.setUnitPrice(item.getUnitPrice());
+                    vo.setOperationTime(item.getOperationTime());
+                    return vo;
+                })
+                .filter(item -> item != null)
+                .toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -125,7 +177,6 @@ public class PurchaseService {
     public void voidDocument(Long id, DocumentVoidDTO dto) {
         BizPurchase purchase = requirePurchase(id);
         ensureNormalStatus(purchase.getBizStatus(), "进货单");
-        validateHistoricalRedFlushOnly(purchase.getOperationTime(), dto, "进货单");
 
         decreaseStock(purchase.getGoodsId(), purchase.getQuantity(), "当前库存不足，无法作废该进货单");
 
@@ -195,17 +246,6 @@ public class PurchaseService {
             throw BusinessException.validateFail(docName + "已作废，禁止重复操作");
         }
         throw BusinessException.validateFail(docName + "为红冲单，禁止删除或再次作废");
-    }
-
-    private void validateHistoricalRedFlushOnly(LocalDateTime operationTime, DocumentVoidDTO dto, String docName) {
-        if (operationTime == null) {
-            return;
-        }
-        boolean isToday = operationTime.toLocalDate().equals(LocalDate.now());
-        boolean createRedFlush = dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush());
-        if (!isToday && !createRedFlush) {
-            throw BusinessException.validateFail("历史" + docName + "仅支持作废红冲");
-        }
     }
 
     private String normalizeReason(String reason) {

@@ -11,7 +11,9 @@ import java.time.LocalDateTime;
 @Data
 public class SalesReturnSaveDTO {
 
-    @NotNull(message = "商品不能为空")
+    @NotNull(message = "来源销售单不能为空")
+    private Long sourceSalesId;
+
     private Long goodsId;
 
     @NotNull(message = "数量不能为空")

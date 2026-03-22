@@ -3,14 +3,14 @@
     <el-card>
       <div class="search-box">
         <div class="top-right-help">
-          <span class="help-label">作废红冲:</span>
-          <el-tooltip content="作废红冲：保留原单并生成反向红字记录，便于审计追溯。" placement="left">
+          <span class="help-label">作废/红冲:</span>
+          <el-tooltip content="仅作废：撤销业务并回滚库存；作废并红冲：额外生成红冲单用于审计追溯。" placement="left">
             <el-icon class="void-help-icon"><QuestionFilled /></el-icon>
           </el-tooltip>
         </div>
         <el-form :inline="true" :model="searchForm">
           <el-form-item label="退货单号">
-            <el-input v-model="searchForm.keywords" placeholder="请输入销售退货单号或商品名" clearable></el-input>
+            <el-input v-model="searchForm.keywords" placeholder="请输入销售退货单号" clearable></el-input>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleSearch">查询</el-button>
@@ -23,21 +23,23 @@
       <el-table :data="tableData" border style="width: 100%" v-loading="loading">
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column prop="returnNo" label="销售退货单号" width="150" />
+        <el-table-column prop="orderNo" label="原销售单" width="150" />
         <el-table-column prop="goodsName" label="退回商品" />
         <el-table-column prop="reason" label="退货原因" show-overflow-tooltip />
         <el-table-column prop="quantity" label="退货数量" width="100" />
         <el-table-column prop="refundAmount" label="退货金额(元)" width="120" />
         <el-table-column prop="returnDate" label="退货日期" width="180" />
         <el-table-column prop="operator" label="操作人" width="100" />
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="scope">
             <div class="action-group">
               <el-button size="small" type="primary" link @click="handleView(scope.row)">详情</el-button>
               <template v-if="canDelete(scope.row)">
                 <el-button v-permission="['admin']" size="small" type="danger" link @click="handleDelete(scope.row)">删除</el-button>
               </template>
-              <template v-else-if="canRedFlush(scope.row)">
-                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废红冲</el-button>
+              <template v-else-if="canVoid(scope.row)">
+                <el-button v-permission="['admin']" size="small" type="warning" link @click="handleVoid(scope.row, false)">仅作废</el-button>
+                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废并红冲</el-button>
               </template>
               <span v-else class="action-disabled">{{ actionDisabledText(scope.row) }}</span>
             </div>
@@ -60,10 +62,27 @@
 
     <el-dialog :title="dialogType === 'view' ? '销售退货详情' : '新增销售退货单'" v-model="dialogVisible" width="500px">
       <el-form ref="dialogFormRef" :model="dialogForm" :rules="dialogRules" label-width="100px" :disabled="dialogType === 'view'">
-        <el-form-item label="退回商品" prop="goodsId">
-          <el-select v-model="dialogForm.goodsId" placeholder="请选择商品" style="width: 100%">
-            <el-option v-for="item in goodsOptions" :key="item.id" :label="item.name" :value="item.id" />
+        <el-form-item label="来源销售单" prop="sourceSalesId">
+          <el-select
+            v-model="dialogForm.sourceSalesId"
+            placeholder="请选择来源销售单"
+            style="width: 100%"
+            filterable
+            @change="handleSourceSalesChange"
+          >
+            <el-option
+              v-for="item in sourceSalesOptions"
+              :key="item.id"
+              :label="`${item.salesNo} | ${item.goodsName} | 可退:${item.returnableQuantity}`"
+              :value="item.id"
+            />
           </el-select>
+        </el-form-item>
+        <el-form-item label="退回商品">
+          <el-input :value="selectedSourceSales?.goodsName || '-'" disabled />
+        </el-form-item>
+        <el-form-item label="可退数量">
+          <el-input :value="String(selectedSourceSales?.returnableQuantity ?? '-')" disabled />
         </el-form-item>
         <el-form-item label="退回数量" prop="quantity">
           <el-input-number v-model="dialogForm.quantity" :min="1" style="width: 100%" />
@@ -106,7 +125,7 @@ import { QuestionFilled } from '@element-plus/icons-vue'
 import {
   createSalesReturnAPI,
   deleteSalesReturnAPI,
-  getGoodsOptionsAPI,
+  getReturnableSalesOptionsAPI,
   getSalesReturnDetailAPI,
   getSalesReturnPageAPI,
   voidSalesReturnAPI
@@ -117,14 +136,15 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const loading = ref(false)
-const goodsOptions = ref([])
+const sourceSalesOptions = ref([])
+const selectedSourceSales = ref(null)
 
 const tableData = ref([])
 
 const dialogVisible = ref(false)
 const dialogType = ref('add')
 const dialogFormRef = ref(null)
-const dialogForm = reactive({ goodsId: null, quantity: 1, unitPrice: 0, returnDate: '', reason: '' })
+const dialogForm = reactive({ sourceSalesId: null, quantity: 1, unitPrice: 0, returnDate: '', reason: '' })
 
 const refundAmountText = computed(() => {
   const qty = Number(dialogForm.quantity || 0)
@@ -133,7 +153,7 @@ const refundAmountText = computed(() => {
 })
 
 const dialogRules = {
-  goodsId: [{ required: true, message: '请选择商品', trigger: 'change' }],
+  sourceSalesId: [{ required: true, message: '请选择来源销售单', trigger: 'change' }],
   quantity: [{ required: true, message: '请输入数量', trigger: 'blur' }],
   unitPrice: [{ required: true, message: '请输入退货单价', trigger: 'blur' }],
   returnDate: [{ required: true, message: '请选择退货日期', trigger: 'change' }]
@@ -163,7 +183,7 @@ const canDelete = (row) => {
   return toDateOnly(row?.returnDate) === localToday()
 }
 
-const canRedFlush = (row) => {
+const canVoid = (row) => {
   if (row?.__uiDeleted) return false
   if (row?.bizStatus !== 1) return false
   return toDateOnly(row?.returnDate) !== localToday()
@@ -197,12 +217,19 @@ const chooseFrontendRecordBehavior = async () => {
   }
 }
 
-const loadGoodsOptions = async () => {
-  const res = await getGoodsOptionsAPI()
+const loadSourceSalesOptions = async () => {
+  const res = await getReturnableSalesOptionsAPI()
   if (res.code !== 200) {
-    throw new Error(res.msg || '加载商品下拉失败')
+    throw new Error(res.msg || '加载来源销售单失败')
   }
-  goodsOptions.value = res.data || []
+  sourceSalesOptions.value = res.data || []
+}
+
+const handleSourceSalesChange = (sourceSalesId) => {
+  selectedSourceSales.value = sourceSalesOptions.value.find((item) => item.id === sourceSalesId) || null
+  if (dialogType.value === 'add' && selectedSourceSales.value) {
+    dialogForm.unitPrice = Number(selectedSourceSales.value.unitPrice || 0)
+  }
 }
 
 const loadList = async () => {
@@ -211,8 +238,7 @@ const loadList = async () => {
     const params = {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
-      returnNo: searchForm.keywords || undefined,
-      goodsName: searchForm.keywords || undefined
+      returnNo: searchForm.keywords || undefined
     }
     const res = await getSalesReturnPageAPI(params)
     if (res.code !== 200) {
@@ -256,7 +282,8 @@ const handleCurrentChange = (val) => {
 const handleAdd = () => {
   dialogType.value = 'add'
   dialogFormRef.value?.clearValidate()
-  Object.assign(dialogForm, { goodsId: null, quantity: 1, unitPrice: 0, returnDate: '', reason: '' })
+  selectedSourceSales.value = null
+  Object.assign(dialogForm, { sourceSalesId: null, quantity: 1, unitPrice: 0, returnDate: '', reason: '' })
   dialogVisible.value = true
 }
 
@@ -268,8 +295,14 @@ const handleView = async (row) => {
     }
     const detail = res.data || {}
     dialogType.value = 'view'
+    selectedSourceSales.value = {
+      id: detail.sourceSalesId,
+      salesNo: detail.sourceSalesNo,
+      goodsName: detail.goodsName,
+      returnableQuantity: detail.quantity
+    }
     Object.assign(dialogForm, {
-      goodsId: detail.goodsId ?? null,
+      sourceSalesId: detail.sourceSalesId ?? null,
       quantity: detail.quantity ?? 1,
       unitPrice: detail.unitPrice ?? (detail.refundAmount && detail.quantity ? Number(detail.refundAmount) / Number(detail.quantity) : 0),
       returnDate: normalizeDateTime(detail.returnDate),
@@ -339,8 +372,11 @@ const submitForm = () => {
       return
     }
     try {
+      if (selectedSourceSales.value && dialogForm.quantity > selectedSourceSales.value.returnableQuantity) {
+        throw new Error(`退货数量超出可退数量，最多可退 ${selectedSourceSales.value.returnableQuantity}`)
+      }
       const payload = {
-        goodsId: dialogForm.goodsId,
+        sourceSalesId: dialogForm.sourceSalesId,
         quantity: dialogForm.quantity,
         unitPrice: Number(dialogForm.unitPrice),
         operationTime: buildOperationTime(dialogForm.returnDate),
@@ -352,6 +388,7 @@ const submitForm = () => {
       }
       ElMessage.success('销售退货新增成功')
       dialogVisible.value = false
+      await loadSourceSalesOptions()
       loadList()
     } catch (error) {
       ElMessage.error(error.message || '新增失败')
@@ -361,7 +398,7 @@ const submitForm = () => {
 
 onMounted(async () => {
   try {
-    await loadGoodsOptions()
+    await loadSourceSalesOptions()
     await loadList()
   } catch (error) {
     ElMessage.error(error.message || '初始化失败')
