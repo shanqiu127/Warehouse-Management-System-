@@ -102,7 +102,7 @@ public class SalesChartService {
         vo.setAmountList(amountList);
         return vo;
     }
-
+    // 解析查询条件中的日期范围，返回包含开始日期、结束日期及其对应的 LocalDateTime 的 DateRange 对象
     private DateRange resolveRange(SalesChartQueryDTO queryDTO) {
         LocalDate startDate = queryDTO.getStartDate();
         LocalDate endDate = queryDTO.getEndDate();
@@ -130,7 +130,7 @@ public class SalesChartService {
 
         return new DateRange(startDate, endDate, startDate.atStartOfDay(), endDate.plusDays(1).atStartOfDay());
     }
-
+    // 辅助方法：如果金额值为 null，则返回 BigDecimal.ZERO；否则返回原值
     private BigDecimal defaultAmount(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }

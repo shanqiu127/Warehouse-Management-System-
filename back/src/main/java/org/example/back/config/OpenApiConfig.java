@@ -8,7 +8,7 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
+// 这是一个配置类，用于设置 OpenAPI（Swagger）的相关信息和安全方案
 @Configuration
 public class OpenApiConfig {
 

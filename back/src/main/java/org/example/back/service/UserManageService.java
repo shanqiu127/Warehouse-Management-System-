@@ -21,8 +21,8 @@ import java.util.List;
 @Service
 public class UserManageService {
 
-    private static final String DEFAULT_PASSWORD = "ljs2005416LJS@";
-    private static final String ROLE_superadmin = "superadmin";
+    private static final String DEFAULT_PASSWORD = "123456";
+    private static final String ROLE_SUPERADMIN = "superadmin";
     private static final String ROLE_ADMIN = "admin";
     private static final String ROLE_EMPLOYEE = "employee";
 
@@ -47,6 +47,7 @@ public class UserManageService {
 
     public void create(UserSaveDTO dto) {
         validateRoleForManage(dto.getRole());
+        rejectSuperadminCreate(dto.getRole());
         checkUsernameUnique(dto.getUsername(), null);
         SysUser user = new SysUser();
         BeanUtils.copyProperties(dto, user);
@@ -58,6 +59,7 @@ public class UserManageService {
     public void update(Long id, UserSaveDTO dto) {
         SysUser user = requireUser(id);
         validateRoleForManage(dto.getRole());
+        validateSuperadminRoleChange(user.getRole(), dto.getRole());
         checkUsernameUnique(dto.getUsername(), id);
         user.setUsername(dto.getUsername());
         user.setRealName(dto.getRealName());
@@ -73,7 +75,7 @@ public class UserManageService {
             throw BusinessException.validateFail("用户状态只能为 0 或 1");
         }
         SysUser user = requireUser(id);
-        if (ROLE_superadmin.equals(user.getRole())) {
+        if (ROLE_SUPERADMIN.equals(user.getRole())) {
             throw BusinessException.validateFail("超级管理员状态不允许修改");
         }
         user.setStatus(status);
@@ -82,7 +84,7 @@ public class UserManageService {
 
     public void delete(Long id) {
         SysUser user = requireUser(id);
-        if (ROLE_superadmin.equals(user.getRole())) {
+        if (ROLE_SUPERADMIN.equals(user.getRole())) {
             throw BusinessException.validateFail("超级管理员账号不允许删除");
         }
         if ("admin".equals(user.getUsername())) {
@@ -102,8 +104,8 @@ public class UserManageService {
         String operatorRole = operator.getRole();
         String targetRole = targetUser.getRole();
 
-        if (ROLE_superadmin.equals(operatorRole)) {
-            if (ROLE_superadmin.equals(targetRole)) {
+        if (ROLE_SUPERADMIN.equals(operatorRole)) {
+            if (ROLE_SUPERADMIN.equals(targetRole)) {
                 throw BusinessException.validateFail("超级管理员账号不允许通过该接口修改密码");
             }
         } else if (ROLE_ADMIN.equals(operatorRole)) {
@@ -128,8 +130,26 @@ public class UserManageService {
     }
 
     private void validateRoleForManage(String role) {
-        if (!ROLE_ADMIN.equals(role) && !ROLE_EMPLOYEE.equals(role)) {
-            throw BusinessException.validateFail("用户角色仅支持 admin 或 employee");
+        if (!ROLE_SUPERADMIN.equals(role) && !ROLE_ADMIN.equals(role) && !ROLE_EMPLOYEE.equals(role)) {
+            throw BusinessException.validateFail("用户角色仅支持 superadmin、admin 或 employee");
+        }
+    }
+
+    private void rejectSuperadminCreate(String role) {
+        if (ROLE_SUPERADMIN.equals(role)) {
+            throw BusinessException.validateFail("超级管理员账号仅允许系统初始化，不支持在用户管理中新增");
+        }
+    }
+
+    private void validateSuperadminRoleChange(String oldRole, String newRole) {
+        if (!StringUtils.hasText(oldRole) || !StringUtils.hasText(newRole)) {
+            return;
+        }
+        if (ROLE_SUPERADMIN.equals(oldRole) && !ROLE_SUPERADMIN.equals(newRole)) {
+            throw BusinessException.validateFail("超级管理员角色不允许变更");
+        }
+        if (!ROLE_SUPERADMIN.equals(oldRole) && ROLE_SUPERADMIN.equals(newRole)) {
+            throw BusinessException.validateFail("普通账号不允许修改为超级管理员");
         }
     }
 

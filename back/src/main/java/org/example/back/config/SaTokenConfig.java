@@ -21,7 +21,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
      * 不需要登录校验的路径（白名单）
      */
     private static final List<String> WHITE_LIST = Arrays.asList(
-            "/auth/login",              // 登录接口
+            "/auth/login",         // 登录接口
             "/auth/register",           // 注册接口（仅普通用户）
             "/auth/captcha",            // 验证码接口（如有）
             "/swagger-ui/**",           // Swagger UI

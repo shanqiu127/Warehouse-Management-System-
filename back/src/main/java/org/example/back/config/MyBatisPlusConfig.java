@@ -15,10 +15,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MyBatisPlusConfig {
 
-    /**
-     * MyBatis-Plus 拦截器配置
-     * 配置分页插件、乐观锁、防止全表更新和删除
-     */
+
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();

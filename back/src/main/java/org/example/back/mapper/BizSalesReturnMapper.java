@@ -7,7 +7,9 @@ import org.apache.ibatis.annotations.Select;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
+/**
+ * 销售退货记录 Mapper 接口,数据库操作接口
+ */
 public interface BizSalesReturnMapper extends BaseMapper<BizSalesReturn> {
 
 		@Select("""

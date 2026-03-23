@@ -55,7 +55,7 @@ public class PurchaseReturnService {
     public PageResult<PurchaseReturnVO> page(PurchaseReturnQueryDTO queryDTO) {
         LocalDateTime startTime = queryDTO.getStartDate() == null ? null : queryDTO.getStartDate().atStartOfDay();
         LocalDateTime endTime = queryDTO.getEndDate() == null ? null : queryDTO.getEndDate().plusDays(1).atStartOfDay();
-
+        // 构建查询条件
         LambdaQueryWrapper<BizPurchaseReturn> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getReturnNo()), BizPurchaseReturn::getReturnNo, queryDTO.getReturnNo())
                 .like(StringUtils.hasText(queryDTO.getGoodsName()), BizPurchaseReturn::getGoodsName, queryDTO.getGoodsName())
@@ -63,14 +63,14 @@ public class PurchaseReturnService {
             .ge(startTime != null, BizPurchaseReturn::getOperationTime, startTime)
             .lt(endTime != null, BizPurchaseReturn::getOperationTime, endTime)
                 .orderByDesc(BizPurchaseReturn::getId);
-
+        // 执行分页查询
         Page<BizPurchaseReturn> page = bizPurchaseReturnMapper.selectPage(new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize()), wrapper);
         Map<Long, BaseGoods> goodsMap = buildGoodsMap(page.getRecords().stream().map(BizPurchaseReturn::getGoodsId).collect(Collectors.toSet()));
         Map<Long, BaseSupplier> supplierMap = buildSupplierMap(goodsMap.values().stream()
                 .map(BaseGoods::getSupplierId)
                 .filter(id -> id != null)
                 .collect(Collectors.toSet()));
-
+        // 将查询到的 BizPurchaseReturn 实体列表转换为 PurchaseReturnVO 列表，并关联查询商品和供应商信息以填充 VO 对象
         List<PurchaseReturnVO> records = page.getRecords().stream()
                 .map(item -> {
                     BaseGoods goods = goodsMap.get(item.getGoodsId());
@@ -78,7 +78,7 @@ public class PurchaseReturnService {
                     return toVO(item, supplier);
                 })
                 .toList();
-
+        // 构建并返回分页结果对象，包含转换后的 VO 列表和分页信息
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
@@ -102,7 +102,7 @@ public class PurchaseReturnService {
         LocalDateTime operationTime = dto.getOperationTime() == null ? LocalDateTime.now() : dto.getOperationTime();
 
         LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
-
+        // 构建 BizPurchaseReturn 实体对象，复制属性并设置关联信息
         BizPurchaseReturn entity = new BizPurchaseReturn();
         entity.setReturnNo(CodeGenerator.purchaseReturnNo());
         entity.setSourcePurchaseId(sourcePurchase.getId());
@@ -144,7 +144,7 @@ public class PurchaseReturnService {
         entity.setVoidTime(now);
         entity.setVoidReason(reason);
         bizPurchaseReturnMapper.updateById(entity);
-
+        // 如果前端请求中包含 createRedFlush 标志且为 true，则创建对应的红冲单
         if (dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush())) {
             LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
             BizPurchaseReturn redFlushDoc = new BizPurchaseReturn();
@@ -196,7 +196,7 @@ public class PurchaseReturnService {
             throw BusinessException.validateFail("来源进货单非正常状态，禁止退货");
         }
     }
-
+    // 验证退货数量是否在来源进货单的可退范围内，考虑已关联的退货单数量
     private void validateReturnableQuantity(BizPurchase sourcePurchase, Integer returnQty) {
         LambdaQueryWrapper<BizPurchaseReturn> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BizPurchaseReturn::getSourcePurchaseId, sourcePurchase.getId())
@@ -220,7 +220,7 @@ public class PurchaseReturnService {
             throw BusinessException.validateFail("仅允许删除当天" + docName + "，历史单据请走作废/红冲流程");
         }
     }
-
+    // 确保单据处于正常状态
     private void ensureNormalStatus(Integer bizStatus, String docName) {
         if (bizStatus == null || bizStatus == 1) {
             return;
@@ -237,7 +237,6 @@ public class PurchaseReturnService {
         }
         return reason.trim();
     }
-
     private void validateQuantity(Integer quantity) {
         if (quantity == null || quantity <= 0) {
             throw BusinessException.validateFail("数量必须大于0");

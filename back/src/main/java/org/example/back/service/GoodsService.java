@@ -122,7 +122,7 @@ public class GoodsService {
         }
         return supplier;
     }
-
+    // 验证商品的进价和售价是否合法
     private void validateGoodsPricing(BigDecimal purchasePrice, BigDecimal salePrice) {
         if (purchasePrice == null || purchasePrice.compareTo(BigDecimal.ZERO) <= 0) {
             throw BusinessException.validateFail("进价必须大于0");
@@ -131,13 +131,13 @@ public class GoodsService {
             throw BusinessException.validateFail("售价必须大于0");
         }
     }
-
+    // 验证库存是否合法
     private void validateStock(Integer stock) {
         if (stock != null && stock < 0) {
             throw BusinessException.validateFail("库存不能小于0");
         }
     }
-
+    // 构建供应商 ID 到供应商实体的映射
     private Map<Long, BaseSupplier> buildSupplierMap(Set<Long> supplierIds) {
         if (supplierIds.isEmpty()) {
             return Map.of();

@@ -8,9 +8,10 @@ import org.apache.ibatis.annotations.Select;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-
+/**
+ * 销售记录 Mapper 接口,数据库操作接口
+ */
 public interface BizSalesMapper extends BaseMapper<BizSales> {
-
 	@Select("SELECT MIN(operation_time) FROM biz_sales WHERE is_deleted = 0")
 	LocalDateTime minOperationTime();
 

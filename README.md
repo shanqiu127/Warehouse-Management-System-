@@ -24,17 +24,12 @@
 
 ## 默认账号（可按需修改）
 
-- `superadmin`
-- `admin`
-- `employee`
-
-默认密码:123456
-
-## 角色说明
-
 - `superadmin`：超级管理员，具备管理员全部能力
 - `admin`：管理员，负责系统与业务管理
 - `employee`：普通用户，以查看权限为主
+
+默认密码:123456
+
 
 
 ## 技术栈
@@ -50,6 +45,15 @@
 - Maven（MVN）：用于编译和启动后端。项目自带 Maven Wrapper（`mvnw` / `mvnw.cmd`）(即使未全局安装 Maven 也通常可以直接运行)。
 - Node.js（建议 18+）和 npm：前端基于 Vue 3 + Vite，需要用 npm 安装依赖并启动前端。
 - MySQL 8.0：项目数据存储在 MySQL，需先执行初始化 SQL 脚本。
+
+## 注意事项
+### 必须更改：
+- back/src/main/resources/application.properties 中数据库密码请按本机环境修改。
+### 可选更改：
+- db.sql 中的默认用户账号（`superadmin/admin/employee`）和密码（`123456`）可按需调整。（应用于登录系统时的默认账号密码）
+- back/src/main/java/org/example/back/service/UserManageService.java 中的默认密码为 `123456`。（应用于新建用户时的默认密码）
+- - 这两个是不一样的，前者是数据库初始化时的默认账号密码，后者是通过用户管理界面新建用户时的默认密码。
+
 
 ## 目录结构
 
@@ -74,10 +78,6 @@ cd "Warehouse Management System"
 
 1. 创建数据库（建议字符集 utf8mb4）。
 2. 执行根目录数据库脚本：`db.sql`。
-
-### 配置文件说明
-
-- `back/src/main/resources/application.properties` 中数据库密码请按本机环境修改。
 
 
 

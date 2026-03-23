@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * 分页响应结果类
- * 匹配前端分页组件解析习惯: { "records": [], "total": 0 }
+ * 匹配前端分页组件解析: { "records": [], "total": 0 }
  *
  * @param <T> 数据类型
  */

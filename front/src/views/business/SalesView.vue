@@ -319,7 +319,7 @@ const handleDelete = (row) => {
 const handleVoid = async (row, createRedFlush) => {
   try {
     const title = createRedFlush ? '作废并红冲' : '作废单据'
-    const promptText = createRedFlush ? '请输入红冲原因（可选）' : '请输入作废原因（可选）'
+    const promptText = createRedFlush ? '请输入红冲原因' : '请输入作废原因'
     const { value } = await ElMessageBox.prompt(promptText, title, {
       confirmButtonText: '确定',
       cancelButtonText: '取消',

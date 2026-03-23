@@ -31,7 +31,7 @@ public class EmployeeService {
 
     @Autowired
     private SysDeptMapper sysDeptMapper;
-
+    // 员工分页查询
     public PageResult<EmployeeVO> page(EmployeeQueryDTO queryDTO) {
         LambdaQueryWrapper<SysEmployee> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getEmpName()), SysEmployee::getEmpName, queryDTO.getEmpName())
@@ -92,7 +92,7 @@ public class EmployeeService {
         }
         return dept;
     }
-
+    // 构建部门 ID 到部门实体的映射
     private Map<Long, SysDept> buildDeptMap(Set<Long> deptIds) {
         if (deptIds.isEmpty()) {
             return Map.of();

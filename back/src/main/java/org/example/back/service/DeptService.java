@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-
+// 部门 Service
 @Service
 public class DeptService {
 
@@ -28,7 +28,7 @@ public class DeptService {
 
     @Autowired
     private SysEmployeeMapper sysEmployeeMapper;
-
+    // 部门分页查询
     public PageResult<DeptVO> page(DeptQueryDTO queryDTO) {
         LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getDeptName()), SysDept::getDeptName, queryDTO.getDeptName())
@@ -38,7 +38,7 @@ public class DeptService {
         List<DeptVO> records = page.getRecords().stream().map(this::toVO).toList();
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
-
+    // 部门选项列表
     public List<OptionVO> options() {
         LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByAsc(SysDept::getDeptName);
@@ -78,7 +78,7 @@ public class DeptService {
         }
         sysDeptMapper.deleteById(id);
     }
-
+    // 根据 ID 获取部门，若不存在则抛出异常
     private SysDept requireDept(Long id) {
         SysDept dept = sysDeptMapper.selectById(id);
         if (dept == null) {
@@ -95,7 +95,7 @@ public class DeptService {
             throw BusinessException.validateFail("部门名称已存在");
         }
     }
-
+    // 将部门实体转换为 VO 对象
     private DeptVO toVO(SysDept dept) {
         DeptVO vo = new DeptVO();
         BeanUtils.copyProperties(dept, vo);

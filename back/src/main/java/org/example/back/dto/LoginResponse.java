@@ -47,7 +47,7 @@ public class LoginResponse {
         private String realName;
 
         /**
-         * 角色：admin-管理员，employee-普通员工
+         * 角色：admin-管理员，employee-普通员工，superadmin-超级管理员
          */
         private String role;
 

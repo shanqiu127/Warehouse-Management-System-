@@ -83,7 +83,7 @@ public class NoticeService {
         vo.setDate(notice.getPublishTime());
         return vo;
     }
-
+    // 获取当前登录用户的真实姓名，若无法获取则返回默认值 "系统"
     private String currentRealName() {
         Object userInfo = StpUtil.getSession().get("userInfo");
         if (userInfo instanceof LoginResponse.UserInfoVO loginUser) {

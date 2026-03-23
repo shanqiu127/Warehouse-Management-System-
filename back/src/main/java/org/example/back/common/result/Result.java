@@ -9,7 +9,7 @@ import java.io.Serializable;
 
 /**
  * 统一响应结果类
- * 匹配前端 request.js 解析习惯: { "code": 200, "msg": "成功", "data": ... }
+ * 匹配前端 request.js 解析: { "code": 200, "msg": "成功", "data": ... }
  *
  * @param <T> 数据类型
  */

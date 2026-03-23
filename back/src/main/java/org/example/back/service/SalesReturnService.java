@@ -109,6 +109,7 @@ public class SalesReturnService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    // 作废单据，更新单据状态并记录作废信息，同时根据前端请求决定是否创建对应的红冲单
     public void voidDocument(Long id, DocumentVoidDTO dto) {
         BizSalesReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "客退单");
@@ -143,7 +144,7 @@ public class SalesReturnService {
             bizSalesReturnMapper.insert(redFlushDoc);
         }
     }
-
+    
     private BizSalesReturn requireEntity(Long id) {
         BizSalesReturn entity = bizSalesReturnMapper.selectById(id);
         if (entity == null) {

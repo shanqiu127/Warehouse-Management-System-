@@ -127,7 +127,7 @@ public class GlobalExceptionHandler {
         recordErrorLog(request, e, 500);
         return Result.fail("系统异常，请稍后重试");
     }
-
+    // 记录错误日志到数据库
     private void recordErrorLog(HttpServletRequest request, Throwable error, Integer statusCode) {
         try {
             SysErrorLog logEntity = new SysErrorLog();
@@ -142,7 +142,7 @@ public class GlobalExceptionHandler {
             log.warn("写入 sys_error_log 失败: {}", ex.getMessage());
         }
     }
-
+    // 为了防止日志过长导致数据库存储问题，截取前 500 字符
     private String safeMessage(String msg) {
         if (msg == null) {
             return "";
