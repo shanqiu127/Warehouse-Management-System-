@@ -41,18 +41,30 @@
         <el-table-column prop="returnDate" label="退货日期" width="180" />
         <el-table-column prop="operator" label="操作人" width="100" />
         <el-table-column prop="reason" label="退货原因" show-overflow-tooltip />
-        <el-table-column label="操作" width="240" fixed="right">
+        <el-table-column label="操作" width="130" fixed="right">
           <template #default="scope">
             <div class="action-group">
               <el-button size="small" type="primary" link @click="handleView(scope.row)">查看</el-button>
-              <template v-if="canDelete(scope.row)">
-                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleDelete(scope.row)">删除</el-button>
-              </template>
-              <template v-else-if="canVoid(scope.row)">
-                <el-button v-permission="['admin']" size="small" type="warning" link @click="handleVoid(scope.row, false)">仅作废</el-button>
-                <el-button v-permission="['admin']" size="small" type="danger" link @click="handleVoid(scope.row, true)">作废并红冲</el-button>
-              </template>
-              <span v-else class="action-disabled">{{ actionDisabledText(scope.row) }}</span>
+              <el-button
+                v-permission="['admin']"
+                size="small"
+                type="warning"
+                link
+                :disabled="!canVoid(scope.row)"
+                @click="handleVoid(scope.row, false)"
+              >
+                仅作废
+              </el-button>
+              <el-button
+                v-permission="['admin']"
+                size="small"
+                type="danger"
+                link
+                :disabled="!canVoid(scope.row)"
+                @click="handleVoid(scope.row, true)"
+              >
+                作废并红冲
+              </el-button>
             </div>
           </template>
         </el-table-column>
@@ -441,9 +453,13 @@ onMounted(async () => {
 
 .action-group {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.action-group :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 
 .void-help-icon {
