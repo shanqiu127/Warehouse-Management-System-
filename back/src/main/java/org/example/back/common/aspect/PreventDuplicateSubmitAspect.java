@@ -7,7 +7,9 @@ import org.example.back.common.exception.BusinessException;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -18,6 +20,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -28,14 +31,22 @@ import java.util.stream.Collectors;
 public class PreventDuplicateSubmitAspect {
 
     private static final int MAX_CACHE_SIZE = 10000;
+    private static final String REDIS_KEY_PREFIX = "wms:dedup:";
 
     private final Map<String, Long> requestWindowMap = new ConcurrentHashMap<>();
+
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
 
     @Before("@annotation(preventDuplicateSubmit)")
     public void preventDuplicateSubmit(JoinPoint joinPoint, PreventDuplicateSubmit preventDuplicateSubmit) {
         long now = System.currentTimeMillis();
         long intervalMs = preventDuplicateSubmit.intervalMs();
         String requestKey = buildRequestKey(joinPoint);
+
+        if (tryAcquireDistributedWindow(requestKey, intervalMs, preventDuplicateSubmit.message())) {
+            return;
+        }
 
         requestWindowMap.compute(requestKey, (key, lastTime) -> {
             if (lastTime != null && now - lastTime < intervalMs) {
@@ -45,6 +56,29 @@ public class PreventDuplicateSubmitAspect {
         });
 
         cleanupIfNecessary(now, intervalMs);
+    }
+
+    /**
+     * 优先使用 Redis 做分布式防重，确保多实例部署时仍能拦截重复请求。
+     * Redis 不可用时返回 false，交由本地窗口兜底。
+     */
+    private boolean tryAcquireDistributedWindow(String requestKey, long intervalMs, String rejectMessage) {
+        if (stringRedisTemplate == null) {
+            return false;
+        }
+        try {
+            String redisKey = REDIS_KEY_PREFIX + requestKey;
+            Boolean acquired = stringRedisTemplate.opsForValue()
+                    .setIfAbsent(redisKey, "1", intervalMs, TimeUnit.MILLISECONDS);
+            if (Boolean.TRUE.equals(acquired)) {
+                return true;
+            }
+            throw BusinessException.validateFail(rejectMessage);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private String buildRequestKey(JoinPoint joinPoint) {
