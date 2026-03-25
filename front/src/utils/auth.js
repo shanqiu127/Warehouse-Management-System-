@@ -1,7 +1,7 @@
 const TOKEN_KEY = "token"
 const ROLE_KEY = "role"
 
-const normalizeRole = (role) => {
+export const normalizeRole = (role) => {
   return String(role || "").trim().toLowerCase()
 }
 
@@ -33,3 +33,7 @@ export const hasRole = (currentRole, allowRoles = []) => {
   return normalizedAllowRoles.includes(normalizedRole)
     || (normalizedRole === "superadmin" && normalizedAllowRoles.includes("admin"))
 }
+
+export const isSuperAdmin = (role) => normalizeRole(role) === "superadmin"
+
+export const canAccessRoles = (currentRole, allowRoles = []) => hasRole(currentRole, allowRoles)

@@ -1,6 +1,7 @@
 package org.example.back.controller;
 
 import jakarta.validation.Valid;
+import org.example.back.common.annotation.AuditLog;
 import org.example.back.common.annotation.PreventDuplicateSubmit;
 import org.example.back.common.annotation.RequireAdmin;
 import org.example.back.common.result.PageResult;
@@ -54,6 +55,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditLog(module = "用户管理", action = "删除", targetType = "用户")
     @PreventDuplicateSubmit(intervalMs = 1000, message = "删除请求过于频繁，请稍后再试")
     public Result<Void> delete(@PathVariable Long id) {
         userManageService.delete(id);
@@ -61,6 +63,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}/password")
+    @AuditLog(module = "用户管理", action = "重置密码", targetType = "用户")
     @PreventDuplicateSubmit(intervalMs = 1500, message = "请勿重复提交重置密码请求")
     public Result<Void> resetPassword(@PathVariable Long id, @Valid @RequestBody UserResetPasswordDTO dto) {
         userManageService.resetPassword(id, dto.getNewPassword());

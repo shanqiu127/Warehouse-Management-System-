@@ -296,13 +296,15 @@ public class PurchaseReturnService {
     private PurchaseReturnVO toVO(BizPurchaseReturn entity, BaseSupplier supplier) {
         PurchaseReturnVO vo = new PurchaseReturnVO();
         BeanUtils.copyProperties(entity, vo);
+        LocalDateTime bizTime = entity.getOperationTime() == null ? entity.getCreateTime() : entity.getOperationTime();
         vo.setSupplierName(supplier == null ? null : supplier.getSupplierName());
         vo.setSourcePurchaseId(entity.getSourcePurchaseId());
         vo.setSourcePurchaseNo(entity.getSourcePurchaseNo());
         vo.setOrderNo(entity.getSourcePurchaseNo());
         vo.setReturnQuantity(entity.getQuantity());
         vo.setReturnAmount(entity.getTotalPrice());
-        vo.setReturnDate(entity.getOperationTime());
+        vo.setOperationTime(bizTime);
+        vo.setReturnDate(bizTime);
         vo.setOperator(entity.getOperatorName());
         vo.setReason(entity.getRemark());
         vo.setBizStatus(entity.getBizStatus());

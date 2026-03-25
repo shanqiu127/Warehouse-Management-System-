@@ -46,6 +46,27 @@
             <div class="action-group">
               <el-button size="small" type="primary" link @click="handleView(scope.row)">查看</el-button>
               <el-button
+                v-if="scope.row?.__uiDeleted"
+                v-permission="['admin']"
+                size="small"
+                type="danger"
+                link
+                disabled
+              >
+                删除
+              </el-button>
+              <el-button
+                v-else-if="canDelete(scope.row)"
+                v-permission="['admin']"
+                size="small"
+                type="danger"
+                link
+                @click="handleDelete(scope.row)"
+              >
+                删除
+              </el-button>
+              <template v-else>
+              <el-button
                 v-permission="['admin']"
                 size="small"
                 type="warning"
@@ -65,6 +86,7 @@
               >
                 作废并红冲
               </el-button>
+              </template>
             </div>
           </template>
         </el-table-column>
@@ -188,17 +210,21 @@ const localToday = () => {
   const d = String(now.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
+
+const resolveBizDate = (row) => {
+  return row?.returnDate || row?.operationTime || row?.createTime || ''
+}
 // 允许删除
 const canDelete = (row) => {
   if (row?.__uiDeleted) return false
   if (row?.bizStatus !== 1) return false
-  return toDateOnly(row?.returnDate) === localToday()
+  return toDateOnly(resolveBizDate(row)) === localToday()
 }
 // 允许作废
 const canVoid = (row) => {
   if (row?.__uiDeleted) return false
   if (row?.bizStatus !== 1) return false
-  return toDateOnly(row?.returnDate) !== localToday()
+  return toDateOnly(resolveBizDate(row)) !== localToday()
 }
 
 const actionDisabledText = (row) => {
@@ -262,7 +288,7 @@ const loadList = async () => {
     const pageData = res.data || {}
     tableData.value = (pageData.records || []).map((item) => ({
       ...item,
-      returnDate: normalizeDateTime(item.returnDate)
+      returnDate: normalizeDateTime(item.returnDate || item.operationTime || item.createTime)
     }))
     total.value = pageData.total || 0
   } catch (error) {
@@ -322,7 +348,7 @@ const handleView = async (row) => {
       sourcePurchaseId: detail.sourcePurchaseId ?? null,
       returnQuantity: detail.returnQuantity ?? detail.quantity ?? 1,
       price: detail.unitPrice ?? (detail.returnAmount && detail.quantity ? Number(detail.returnAmount) / Number(detail.quantity) : 0),
-      returnDate: normalizeDateTime(detail.returnDate),
+      returnDate: normalizeDateTime(detail.returnDate || detail.operationTime || detail.createTime),
       reason: detail.reason || detail.remark || ''
     })
     dialogVisible.value = true

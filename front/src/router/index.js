@@ -1,6 +1,16 @@
 import { createRouter, createWebHistory } from "vue-router"
 import { ElMessage } from "element-plus"
-import { getRole, getToken, hasRole } from "@/utils/auth"
+import { canAccessRoles, getRole, getToken, isSuperAdmin } from "@/utils/auth"
+
+const SUPERADMIN_ALLOWED_PATHS = new Set([
+  '/',
+  '/home',
+  '/system/super-admin',
+  '/system/security-ip-policy',
+  '/system/login-log',
+  '/system/operation-log',
+  '/403'
+])
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -88,6 +98,30 @@ const router = createRouter({
           name: "SystemEmployee",
           component: () => import("../views/system/EmployeeView.vue"),
           meta: { roles: ['admin', 'superadmin'] } 
+        },
+        {
+          path: "system/super-admin",
+          name: "SystemSuperAdmin",
+          component: () => import("../views/system/SuperAdminDashboardView.vue"),
+          meta: { roles: ['superadmin'] }
+        },
+        {
+          path: "system/security-ip-policy",
+          name: "SystemSecurityIpPolicy",
+          component: () => import("../views/system/SecurityIpPolicyView.vue"),
+          meta: { roles: ['superadmin'] }
+        },
+        {
+          path: "system/login-log",
+          name: "SystemLoginLog",
+          component: () => import("../views/system/LoginLogView.vue"),
+          meta: { roles: ['superadmin'] }
+        },
+        {
+          path: "system/operation-log",
+          name: "SystemOperationLog",
+          component: () => import("../views/system/OperationLogView.vue"),
+          meta: { roles: ['superadmin'] }
         }
       ]
     },
@@ -110,10 +144,16 @@ router.beforeEach((to, from, next) => {
       // 1. 未登录拦截至登录页
       return next('/login')
     } else {
+      // 超级管理员仅保留首页和超管中心能力入口
+      if (isSuperAdmin(role) && !SUPERADMIN_ALLOWED_PATHS.has(to.path)) {
+        ElMessage.warning('超级管理员仅开放首页与超管中心模块')
+        return next('/home')
+      }
+
       // 2. 鉴权：页面是否有角色限制
       if (to.meta && to.meta.roles) {
         const allowRoles = to.meta.roles
-        if (!hasRole(role, allowRoles)) {
+        if (!canAccessRoles(role, allowRoles)) {
           ElMessage.error('无权限访问该页面')
           return next('/403')
         }

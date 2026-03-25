@@ -25,7 +25,10 @@ request.interceptors.response.use(
         window.location.href = "/login"
       }
     } else if (status === 403) {
-      ElMessage.error("当前账号无权限执行该操作")
+      ElMessage.error("无权限访问该页面")
+      if (window.location.pathname !== "/403") {
+        window.location.href = "/403"
+      }
     }
     return Promise.reject(error)
   }

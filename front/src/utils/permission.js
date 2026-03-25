@@ -1,4 +1,4 @@
-import { getRole, hasRole } from '@/utils/auth'
+import { canAccessRoles, getRole } from '@/utils/auth'
 
 /**
  * 自定义指令：v-permission
@@ -13,7 +13,7 @@ export default {
 
     if (value && value instanceof Array && value.length > 0) {
       const permissionRoles = value
-      const allowed = hasRole(role, permissionRoles)
+      const allowed = canAccessRoles(role, permissionRoles)
 
       if (!allowed) {
         // 对可交互元素优先禁用并提示，其他元素再移除。

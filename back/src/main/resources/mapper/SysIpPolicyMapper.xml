@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.back.mapper.SysIpPolicyMapper">
+
+    <resultMap id="BaseResultMap" type="org.example.back.entity.SysIpPolicy">
+        <id column="id" property="id"/>
+        <result column="policy_name" property="policyName"/>
+        <result column="ip_cidr" property="ipCidr"/>
+        <result column="allow_flag" property="allowFlag"/>
+        <result column="status" property="status"/>
+        <result column="priority" property="priority"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="is_deleted" property="isDeleted"/>
+    </resultMap>
+
+    <select id="selectDetailById" resultMap="BaseResultMap" parameterType="java.lang.Long">
+        SELECT id,
+               policy_name,
+               ip_cidr,
+               allow_flag,
+               status,
+               priority,
+               remark,
+               create_time,
+               update_time,
+               is_deleted
+        FROM sys_ip_policy
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectEnabledPolicies" resultMap="BaseResultMap">
+        SELECT id,
+               policy_name,
+               ip_cidr,
+               allow_flag,
+               status,
+               priority,
+               remark,
+               create_time,
+               update_time,
+               is_deleted
+        FROM sys_ip_policy
+        WHERE status = 1
+          AND is_deleted = 0
+        ORDER BY priority ASC, id ASC
+    </select>
+
+</mapper>

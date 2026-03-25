@@ -113,6 +113,66 @@ CREATE TABLE `sys_error_log` (
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统错误日志表';
 
+-- 1.5 IP 策略表 (sys_ip_policy)
+-- 存储登录来源 IP 白名单/黑名单策略
+DROP TABLE IF EXISTS `sys_ip_policy`;
+CREATE TABLE `sys_ip_policy` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `policy_name` VARCHAR(100) NOT NULL COMMENT '策略名称',
+    `ip_cidr` VARCHAR(64) NOT NULL COMMENT 'IP或CIDR网段',
+    `allow_flag` TINYINT NOT NULL DEFAULT 1 COMMENT '是否允许: 1-允许, 0-拒绝',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-启用, 0-禁用',
+    `priority` INT NOT NULL DEFAULT 100 COMMENT '优先级(数值越小优先级越高)',
+    `remark` VARCHAR(200) DEFAULT NULL COMMENT '备注',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_ip_cidr` (`ip_cidr`),
+    KEY `idx_priority_status` (`priority`, `status`),
+    KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='IP策略表';
+
+-- 1.6 登录日志表 (sys_login_log)
+-- 存储登录成功/失败记录
+DROP TABLE IF EXISTS `sys_login_log`;
+CREATE TABLE `sys_login_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `user_id` BIGINT DEFAULT NULL COMMENT '用户ID',
+    `username` VARCHAR(50) DEFAULT NULL COMMENT '用户名',
+    `ip` VARCHAR(64) DEFAULT NULL COMMENT '登录IP',
+    `user_agent` VARCHAR(300) DEFAULT NULL COMMENT '客户端标识',
+    `success_flag` TINYINT NOT NULL DEFAULT 1 COMMENT '登录结果: 1-成功, 0-失败',
+    `fail_reason` VARCHAR(200) DEFAULT NULL COMMENT '失败原因',
+    `login_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_username` (`username`),
+    KEY `idx_ip` (`ip`),
+    KEY `idx_login_time` (`login_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录日志表';
+
+-- 1.7 操作日志表 (sys_operation_log)
+-- 存储关键业务操作审计记录
+DROP TABLE IF EXISTS `sys_operation_log`;
+CREATE TABLE `sys_operation_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `user_id` BIGINT DEFAULT NULL COMMENT '操作人ID',
+    `username` VARCHAR(50) DEFAULT NULL COMMENT '操作人用户名',
+    `module` VARCHAR(50) DEFAULT NULL COMMENT '模块名称',
+    `action` VARCHAR(50) DEFAULT NULL COMMENT '操作动作',
+    `target_type` VARCHAR(50) DEFAULT NULL COMMENT '目标类型',
+    `target_id` VARCHAR(64) DEFAULT NULL COMMENT '目标ID',
+    `before_data` TEXT DEFAULT NULL COMMENT '变更前数据(JSON)',
+    `after_data` TEXT DEFAULT NULL COMMENT '变更后数据(JSON)',
+    `request_uri` VARCHAR(200) DEFAULT NULL COMMENT '请求路径',
+    `ip` VARCHAR(64) DEFAULT NULL COMMENT '来源IP',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_module_action` (`module`, `action`),
+    KEY `idx_username` (`username`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
+
 -- =============================================
 -- 二、基础资料表
 -- =============================================
@@ -322,6 +382,10 @@ INSERT INTO `sys_user` (`id`, `username`, `password`, `real_name`, `role`, `stat
 (2, 'employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '普通员工', 'employee', 1, '13900139000', 'employee@warehouse.com'),
 (4, 'lisi', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', 1, '13600136000', 'lisi@warehouse.com'),
 (5, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', 1, '13700137000', 'superadmin@warehouse.com');
+
+-- 4.1.1 初始化IP策略示例数据
+INSERT INTO `sys_ip_policy` (`policy_name`, `ip_cidr`, `allow_flag`, `status`, `priority`, `remark`) VALUES
+('本机回环地址', '127.0.0.1/32', 1, 1, 1, '开发环境白名单');
 
 -- 4.2 初始化部门数据
 INSERT INTO `sys_dept` (`dept_name`, `dept_code`, `leader`, `phone`, `description`) VALUES

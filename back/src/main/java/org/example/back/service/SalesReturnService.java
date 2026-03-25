@@ -263,11 +263,13 @@ public class SalesReturnService {
     private SalesReturnVO toVO(BizSalesReturn entity) {
         SalesReturnVO vo = new SalesReturnVO();
         BeanUtils.copyProperties(entity, vo);
+        LocalDateTime bizTime = entity.getOperationTime() == null ? entity.getCreateTime() : entity.getOperationTime();
         vo.setSourceSalesId(entity.getSourceSalesId());
         vo.setSourceSalesNo(entity.getSourceSalesNo());
         vo.setOrderNo(entity.getSourceSalesNo());
         vo.setRefundAmount(entity.getTotalPrice());
-        vo.setReturnDate(entity.getOperationTime());
+        vo.setOperationTime(bizTime);
+        vo.setReturnDate(bizTime);
         vo.setOperator(entity.getOperatorName());
         vo.setReason(entity.getRemark());
         vo.setBizStatus(entity.getBizStatus());

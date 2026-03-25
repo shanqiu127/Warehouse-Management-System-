@@ -273,9 +273,11 @@ public class SalesService {
     private SalesVO toVO(BizSales entity) {
         SalesVO vo = new SalesVO();
         BeanUtils.copyProperties(entity, vo);
+        LocalDateTime bizTime = entity.getOperationTime() == null ? entity.getCreateTime() : entity.getOperationTime();
         vo.setSalesPrice(entity.getUnitPrice());
         vo.setTotalAmount(entity.getTotalPrice());
-        vo.setSalesDate(entity.getOperationTime());
+        vo.setOperationTime(bizTime);
+        vo.setSalesDate(bizTime);
         vo.setOperator(entity.getOperatorName());
         vo.setBizStatus(entity.getBizStatus());
         vo.setSourceId(entity.getSourceId());

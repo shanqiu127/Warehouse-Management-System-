@@ -314,11 +314,13 @@ public class PurchaseService {
     private PurchaseVO toVO(BizPurchase purchase, BaseSupplier supplier) {
         PurchaseVO vo = new PurchaseVO();
         BeanUtils.copyProperties(purchase, vo);
+        LocalDateTime bizTime = purchase.getOperationTime() == null ? purchase.getCreateTime() : purchase.getOperationTime();
         vo.setOrderNo(purchase.getPurchaseNo());
         vo.setSupplierName(supplier == null ? null : supplier.getSupplierName());
         vo.setPrice(purchase.getUnitPrice());
         vo.setTotalAmount(purchase.getTotalPrice());
-        vo.setPurchaseDate(purchase.getOperationTime());
+        vo.setOperationTime(bizTime);
+        vo.setPurchaseDate(bizTime);
         vo.setOperator(purchase.getOperatorName());
         vo.setBizStatus(purchase.getBizStatus());
         vo.setSourceId(purchase.getSourceId());

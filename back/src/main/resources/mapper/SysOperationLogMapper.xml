@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.back.mapper.SysOperationLogMapper">
+
+    <resultMap id="BaseResultMap" type="org.example.back.entity.SysOperationLog">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="username" property="username"/>
+        <result column="module" property="module"/>
+        <result column="action" property="action"/>
+        <result column="target_type" property="targetType"/>
+        <result column="target_id" property="targetId"/>
+        <result column="before_data" property="beforeData"/>
+        <result column="after_data" property="afterData"/>
+        <result column="request_uri" property="requestUri"/>
+        <result column="ip" property="ip"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectDetailById" resultMap="BaseResultMap" parameterType="java.lang.Long">
+        SELECT id,
+               user_id,
+               username,
+               module,
+               action,
+               target_type,
+               target_id,
+               before_data,
+               after_data,
+               request_uri,
+               ip,
+               create_time
+        FROM sys_operation_log
+        WHERE id = #{id}
+    </select>
+
+</mapper>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.back.mapper.SysLoginLogMapper">
+
+    <resultMap id="BaseResultMap" type="org.example.back.entity.SysLoginLog">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="username" property="username"/>
+        <result column="ip" property="ip"/>
+        <result column="user_agent" property="userAgent"/>
+        <result column="success_flag" property="successFlag"/>
+        <result column="fail_reason" property="failReason"/>
+        <result column="login_time" property="loginTime"/>
+    </resultMap>
+
+    <select id="selectDetailById" resultMap="BaseResultMap" parameterType="java.lang.Long">
+        SELECT id,
+               user_id,
+               username,
+               ip,
+               user_agent,
+               success_flag,
+               fail_reason,
+               login_time
+        FROM sys_login_log
+        WHERE id = #{id}
+    </select>
+
+</mapper>

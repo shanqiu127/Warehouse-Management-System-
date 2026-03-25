@@ -2,13 +2,18 @@ package org.example.back.controller;
 
 import jakarta.validation.Valid;
 import org.example.back.common.annotation.PreventDuplicateSubmit;
+import org.example.back.common.exception.BusinessException;
+import org.example.back.common.util.ClientIpUtil;
 import org.example.back.dto.LoginRequest;
 import org.example.back.dto.LoginResponse;
 import org.example.back.dto.RegisterRequest;
 import org.example.back.common.result.Result;
 import org.example.back.service.AuthService;
+import org.example.back.service.LoginLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 认证控制器
@@ -21,6 +26,9 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private LoginLogService loginLogService;
+
     /**
      * 用户登录接口
      *
@@ -29,9 +37,24 @@ public class AuthController {
      */
     @PostMapping("/login")
     @PreventDuplicateSubmit(intervalMs = 1500, message = "登录请求过于频繁，请稍后再试")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
-        return Result.success(response);
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        String clientIp = ClientIpUtil.getClientIp(httpRequest);
+        String userAgent = httpRequest == null ? null : httpRequest.getHeader("User-Agent");
+
+        try {
+            LoginResponse response = authService.login(request);
+            Long userId = response != null && response.getUserInfo() != null
+                    ? response.getUserInfo().getId()
+                    : null;
+            loginLogService.record(userId, request.getUsername(), clientIp, userAgent, true, null);
+            return Result.success(response);
+        } catch (BusinessException e) {
+            loginLogService.record(null, request.getUsername(), clientIp, userAgent, false, e.getMsg());
+            throw e;
+        } catch (Exception e) {
+            loginLogService.record(null, request.getUsername(), clientIp, userAgent, false, "系统异常");
+            throw e;
+        }
     }
 
     /**
