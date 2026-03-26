@@ -74,6 +74,12 @@ const router = createRouter({
           component: () => import("../views/business/SalesChartView.vue"),
           meta: { roles: ['admin', 'superadmin'] } 
         },
+        {
+          path: "business/stock-warning",
+          name: "BusinessStockWarning",
+          component: () => import("../views/business/StockWarningView.vue"),
+          meta: { roles: ['admin', 'employee'] }
+        },
         // 以下为动态权限测试页面
         {
           path: "system/notice",

@@ -36,4 +36,14 @@ public class HomeSummaryVO {
      * 最近系统错误日志（仅首页摘要展示）
      */
     private List<ErrorLogBriefVO> recentErrorLogs;
+
+    /**
+     * 低库存商品数（stock <= warningStock）
+     */
+    private Long lowStockCount;
+
+    /**
+     * 零库存商品数（stock = 0）
+     */
+    private Long zeroStockCount;
 }

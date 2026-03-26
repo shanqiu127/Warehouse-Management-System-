@@ -18,7 +18,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("仓库管理系统后端 API")
-                        .description("第十六阶段交付版：含认证、基础资料、进销退存、统计与作废/红冲流程")
+                        .description("全项目版：覆盖认证授权、系统管理、安全治理、基础资料、进销退存业务与销售统计分析，支持作废与红冲闭环流程")
                         .version("v1.6.0")
                         .contact(new Contact().name("WMS Backend Team")))
                 .addSecurityItem(new SecurityRequirement().addList(schemeName))

@@ -26,9 +26,10 @@
       <!-- 商品库存展示 -->
       <el-table-column prop="stock" label="当前库存" width="100">
         <template #default="scope">
-          <el-tag :type="scope.row.stock < 10 ? 'danger' : 'success'">{{ scope.row.stock }}</el-tag>
+          <el-tag :type="scope.row.stock <= (scope.row.warningStock ?? 10) ? 'danger' : 'success'">{{ scope.row.stock }}</el-tag>
         </template>
       </el-table-column>
+      <el-table-column prop="warningStock" label="预警阈值" width="100" />
       
       <!-- 普通员工仅可见查看，隐藏操作列的修改与删除 -->
       <el-table-column label="操作" width="200" fixed="right">
@@ -80,8 +81,14 @@
         <el-form-item label="初始库存" v-if="!isView && dialogTitle === '新增商品'">
           <el-input-number v-model="form.stock" :min="0" />
         </el-form-item>
+        <el-form-item label="预警阈值" v-if="!isView">
+          <el-input-number v-model="form.warningStock" :min="0" style="width: 100%;" />
+        </el-form-item>
         <el-form-item label="当前库存" v-if="isView">
           <el-input v-model="form.stock" disabled />
+        </el-form-item>
+        <el-form-item label="预警阈值" v-if="isView">
+          <el-input v-model="form.warningStock" disabled />
         </el-form-item>
       </el-form>
       <template #footer v-if="!isView">
@@ -126,7 +133,8 @@ const form = reactive({
   salePrice: 0,
   brand: '',
   unit: '',
-  stock: 0
+  stock: 0,
+  warningStock: 10
 })
 
 const rules = {
@@ -207,6 +215,7 @@ const initForm = () => {
   form.brand = ''
   form.unit = ''
   form.stock = 0
+  form.warningStock = 10
 }
 
 const handleAdd = () => {
@@ -234,7 +243,8 @@ const openByDetail = async (row, viewMode) => {
     salePrice: detail.salePrice || 0,
     brand: detail.brand || '',
     unit: detail.unit || '',
-    stock: detail.stock || 0
+    stock: detail.stock || 0,
+    warningStock: detail.warningStock ?? 10
   })
   formRef.value?.clearValidate()
   dialogVisible.value = true
@@ -281,6 +291,7 @@ const handleSave = () => {
         purchasePrice: form.purchasePrice,
         salePrice: form.salePrice,
         stock: form.stock,
+        warningStock: form.warningStock,
         unit: form.unit,
         status: 1
       }

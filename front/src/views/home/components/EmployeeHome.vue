@@ -30,6 +30,20 @@
             <h3>{{ formatTime(summary.lastLoginTime) }}</h3>
           </div>
         </div>
+
+        <div class="metric-glass card-hover" @click="goStockWarning('low')" style="cursor: pointer;">
+          <div class="metric-content">
+            <p>Low Stock Alerts</p>
+            <h3>{{ summary.lowStockCount ?? 0 }}</h3>
+          </div>
+        </div>
+
+        <div class="metric-glass card-hover" @click="goStockWarning('zero')" style="cursor: pointer;">
+          <div class="metric-content">
+            <p>Zero Stock Alerts</p>
+            <h3>{{ summary.zeroStockCount ?? 0 }}</h3>
+          </div>
+        </div>
       </section>
 
       <div class="layout-grid-full">
@@ -71,11 +85,20 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
 import { getNoticeDetailAPI, getNoticePageAPI } from '@/api/system'
 
-const summary = ref({ username: '', realName: '', currentLoginTime: null, lastLoginTime: null })
+const router = useRouter()
+const summary = ref({
+  username: '',
+  realName: '',
+  currentLoginTime: null,
+  lastLoginTime: null,
+  lowStockCount: 0,
+  zeroStockCount: 0
+})
 const noticeList = ref([])
 const noticeLoading = ref(false)
 const noticeDialogVisible = ref(false)
@@ -118,6 +141,10 @@ const openNotice = async (row) => {
   } catch (error) {
     ElMessage.error('Failed to load notice content')
   }
+}
+
+const goStockWarning = (type = 'low') => {
+  router.push({ path: '/business/stock-warning', query: { type } })
 }
 
 onMounted(() => { loadSummary(); loadNotices(); })

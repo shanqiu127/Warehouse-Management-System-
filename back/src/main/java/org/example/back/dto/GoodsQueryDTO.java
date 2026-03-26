@@ -12,4 +12,11 @@ public class GoodsQueryDTO extends PageQuery {
     private Long supplierId;
 
     private Integer status;
+
+    private Boolean warningOnly;
+
+    /**
+     * warningType: low | zero
+     */
+    private String warningType;
 }

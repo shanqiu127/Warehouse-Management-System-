@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,9 +37,13 @@ public class GoodsService {
 
     public PageResult<GoodsVO> page(GoodsQueryDTO queryDTO) {
         LambdaQueryWrapper<BaseGoods> wrapper = new LambdaQueryWrapper<>();
+        String warningType = queryDTO.getWarningType() == null ? "" : queryDTO.getWarningType().trim().toLowerCase(Locale.ROOT);
+        boolean warningOnly = Boolean.TRUE.equals(queryDTO.getWarningOnly());
         wrapper.like(StringUtils.hasText(queryDTO.getGoodsName()), BaseGoods::getGoodsName, queryDTO.getGoodsName())
                 .eq(queryDTO.getSupplierId() != null, BaseGoods::getSupplierId, queryDTO.getSupplierId())
                 .eq(queryDTO.getStatus() != null, BaseGoods::getStatus, queryDTO.getStatus())
+            .apply(warningOnly && !"zero".equals(warningType), "stock <= warning_stock")
+            .eq(warningOnly && "zero".equals(warningType), BaseGoods::getStock, 0)
                 .orderByDesc(BaseGoods::getId);
 
         Page<BaseGoods> page = baseGoodsMapper.selectPage(new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize()), wrapper);
@@ -66,11 +71,13 @@ public class GoodsService {
         requireSupplier(dto.getSupplierId());
         validateGoodsPricing(dto.getPurchasePrice(), dto.getSalePrice());
         validateStock(dto.getStock());
+        validateWarningStock(dto.getWarningStock());
         BaseGoods goods = new BaseGoods();
         BeanUtils.copyProperties(dto, goods);
         goods.setGoodsCode(CodeGenerator.goodsCode());
         goods.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         goods.setStock(dto.getStock() == null ? 0 : dto.getStock());
+        goods.setWarningStock(dto.getWarningStock() == null ? 10 : dto.getWarningStock());
         baseGoodsMapper.insert(goods);
     }
 
@@ -80,6 +87,7 @@ public class GoodsService {
         checkGoodsNameUnique(dto.getGoodsName(), id);
         validateGoodsPricing(dto.getPurchasePrice(), dto.getSalePrice());
         validateStock(dto.getStock());
+        validateWarningStock(dto.getWarningStock());
         goods.setGoodsName(dto.getGoodsName());
         goods.setCategory(dto.getCategory());
         goods.setBrand(dto.getBrand());
@@ -87,6 +95,7 @@ public class GoodsService {
         goods.setPurchasePrice(dto.getPurchasePrice());
         goods.setSalePrice(dto.getSalePrice());
         goods.setStock(dto.getStock() == null ? goods.getStock() : dto.getStock());
+        goods.setWarningStock(dto.getWarningStock() == null ? goods.getWarningStock() : dto.getWarningStock());
         goods.setUnit(dto.getUnit());
         goods.setStatus(dto.getStatus() == null ? goods.getStatus() : dto.getStatus());
         goods.setDescription(dto.getDescription());
@@ -135,6 +144,12 @@ public class GoodsService {
     private void validateStock(Integer stock) {
         if (stock != null && stock < 0) {
             throw BusinessException.validateFail("库存不能小于0");
+        }
+    }
+
+    private void validateWarningStock(Integer warningStock) {
+        if (warningStock != null && warningStock < 0) {
+            throw BusinessException.validateFail("预警阈值不能小于0");
         }
     }
     // 构建供应商 ID 到供应商实体的映射

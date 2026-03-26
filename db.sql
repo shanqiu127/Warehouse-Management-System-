@@ -211,6 +211,7 @@ CREATE TABLE `base_goods` (
     `purchase_price` DECIMAL(10,2) DEFAULT NULL COMMENT '进价',
     `sale_price` DECIMAL(10,2) DEFAULT NULL COMMENT '售价',
     `stock` INT NOT NULL DEFAULT 0 COMMENT '当前库存量',
+    `warning_stock` INT NOT NULL DEFAULT 10 COMMENT '库存预警阈值',
     `unit` VARCHAR(20) DEFAULT NULL COMMENT '单位',
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-上架, 0-下架',
     `description` VARCHAR(200) DEFAULT NULL COMMENT '描述',
@@ -223,6 +224,7 @@ CREATE TABLE `base_goods` (
     KEY `idx_supplier_status` (`supplier_id`, `status`),
     KEY `idx_brand` (`brand`),
     KEY `idx_stock` (`stock`),
+    KEY `idx_warning_stock` (`warning_stock`),
     KEY `idx_category` (`category`),
     KEY `idx_is_deleted` (`is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品表';

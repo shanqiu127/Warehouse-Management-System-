@@ -32,6 +32,8 @@ public class BaseGoods {
 
     private Integer stock;
 
+    private Integer warningStock;
+
     private String unit;
 
     private Integer status;

@@ -24,6 +24,11 @@
           <el-menu-item index="/business/sales-return">销售退货单</el-menu-item>
         </el-sub-menu>
 
+        <el-sub-menu index="/stock-warning" v-if="!onlySuperAdmin">
+          <template #title>库存预警</template>
+          <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
+        </el-sub-menu>
+
         <!-- 统计报表仅管理员可见 -->
         <el-sub-menu index="/statistics" v-if="isAdminOnly">
           <template #title>统计报表</template>

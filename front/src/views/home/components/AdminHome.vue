@@ -47,6 +47,16 @@
             <h3>{{ roleLabel }}</h3>
           </div>
         </div>
+
+        <div class="metric-glass card-hover" @click="go('/business/stock-warning')" style="cursor: pointer;">
+          <div class="metric-icon">
+            <svg viewBox="0 0 24 24" fill="none" class="icon"><path d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18A2 2 0 0 0 3.55 21H20.45A2 2 0 0 0 22.18 18L13.71 3.86A2 2 0 0 0 10.29 3.86Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="metric-content">
+            <p>Stock Alerts</p>
+            <h3>{{ summary.lowStockCount ?? 0 }} / {{ summary.zeroStockCount ?? 0 }}</h3>
+          </div>
+        </div>
       </section>
 
       <div class="layout-grid">
@@ -103,7 +113,9 @@ const summary = ref({
   realName: '',
   role: '',
   currentLoginTime: null,
-  lastLoginTime: null
+  lastLoginTime: null,
+  lowStockCount: 0,
+  zeroStockCount: 0
 })
 const noticeList = ref([])
 const noticeLoading = ref(false)

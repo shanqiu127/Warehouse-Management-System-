@@ -2,8 +2,10 @@ package org.example.back.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.example.back.dto.LoginResponse;
+import org.example.back.entity.BaseGoods;
 import org.example.back.entity.SysErrorLog;
 import org.example.back.entity.SysUser;
+import org.example.back.mapper.BaseGoodsMapper;
 import org.example.back.mapper.SysErrorLogMapper;
 import org.example.back.mapper.SysUserMapper;
 import org.example.back.vo.ErrorLogBriefVO;
@@ -30,6 +32,9 @@ public class HomeService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private BaseGoodsMapper baseGoodsMapper;
+
     public HomeSummaryVO summary() {
         LoginResponse.UserInfoVO userInfo = authService.getUserInfo();
         SysUser user = sysUserMapper.selectById(userInfo.getId());
@@ -52,6 +57,11 @@ public class HomeService {
             vo.setRecentErrorLogs(queryRecentErrorLogs(5));
         }
 
+        if ("admin".equalsIgnoreCase(role) || "employee".equalsIgnoreCase(role)) {
+            vo.setLowStockCount(countLowStockGoods());
+            vo.setZeroStockCount(countZeroStockGoods());
+        }
+
         return vo;
     }
     // 检查数据库连接状态
@@ -70,6 +80,20 @@ public class HomeService {
         wrapper.ge(SysErrorLog::getCreateTime, begin)
                 .ge(SysErrorLog::getStatusCode, 500);
         return sysErrorLogMapper.selectCount(wrapper);
+    }
+
+    private Long countLowStockGoods() {
+        LambdaQueryWrapper<BaseGoods> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BaseGoods::getStatus, 1)
+                .apply("stock <= warning_stock");
+        return baseGoodsMapper.selectCount(wrapper);
+    }
+
+    private Long countZeroStockGoods() {
+        LambdaQueryWrapper<BaseGoods> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BaseGoods::getStatus, 1)
+                .eq(BaseGoods::getStock, 0);
+        return baseGoodsMapper.selectCount(wrapper);
     }
     // 查询最近的错误日志列表
     private List<ErrorLogBriefVO> queryRecentErrorLogs(int limit) {
