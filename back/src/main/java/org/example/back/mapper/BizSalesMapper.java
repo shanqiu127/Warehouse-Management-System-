@@ -18,6 +18,12 @@ public interface BizSalesMapper extends BaseMapper<BizSales> {
 	@Select("SELECT MAX(operation_time) FROM biz_sales WHERE is_deleted = 0")
 	LocalDateTime maxOperationTime();
 
+	@Select("SELECT MIN(operation_time) FROM biz_sales WHERE is_deleted = 0 AND biz_status = 1")
+	LocalDateTime minValidOperationTime();
+
+	@Select("SELECT MAX(operation_time) FROM biz_sales WHERE is_deleted = 0 AND biz_status = 1")
+	LocalDateTime maxValidOperationTime();
+
 	@Select("""
 			<script>
 			SELECT COALESCE(SUM(total_price), 0)
@@ -41,6 +47,45 @@ public interface BizSalesMapper extends BaseMapper<BizSales> {
 			""")
 	Long sumSalesQuantity(@Param("startTime") LocalDateTime startTime,
 						  @Param("endTime") LocalDateTime endTime);
+
+	@Select("""
+			<script>
+			SELECT COALESCE(SUM(total_price), 0)
+			FROM biz_sales
+			WHERE is_deleted = 0
+			  AND biz_status = 1
+			  AND operation_time <![CDATA[>=]]> #{startTime}
+			  AND operation_time <![CDATA[<]]> #{endTime}
+			</script>
+			""")
+	BigDecimal sumValidSalesAmount(@Param("startTime") LocalDateTime startTime,
+								  @Param("endTime") LocalDateTime endTime);
+
+	@Select("""
+			<script>
+			SELECT COALESCE(SUM(quantity), 0)
+			FROM biz_sales
+			WHERE is_deleted = 0
+			  AND biz_status = 1
+			  AND operation_time <![CDATA[>=]]> #{startTime}
+			  AND operation_time <![CDATA[<]]> #{endTime}
+			</script>
+			""")
+	Long sumValidSalesQuantity(@Param("startTime") LocalDateTime startTime,
+							  @Param("endTime") LocalDateTime endTime);
+
+	@Select("""
+			<script>
+			SELECT COALESCE(SUM(COALESCE(s.cost_total_price, 0)), 0)
+			FROM biz_sales s
+			WHERE s.is_deleted = 0
+			  AND s.biz_status = 1
+			  AND s.operation_time <![CDATA[>=]]> #{startTime}
+			  AND s.operation_time <![CDATA[<]]> #{endTime}
+			</script>
+			""")
+	BigDecimal sumEstimatedSalesCost(@Param("startTime") LocalDateTime startTime,
+								 @Param("endTime") LocalDateTime endTime);
 
 	@Select("""
 			<script>
@@ -88,6 +133,54 @@ public interface BizSalesMapper extends BaseMapper<BizSales> {
 			""")
 	List<DailyAmountAgg> dailySalesAmount(@Param("startTime") LocalDateTime startTime,
 										  @Param("endTime") LocalDateTime endTime);
+
+	@Select("""
+			<script>
+			SELECT COALESCE(NULLIF(TRIM(bg.brand), ''), '未标注品牌') AS name,
+			       SUM(s.total_price - COALESCE(s.cost_total_price, 0)) AS amount
+			FROM biz_sales s
+			LEFT JOIN base_goods bg ON s.goods_id = bg.id
+			WHERE s.is_deleted = 0
+			  AND s.biz_status = 1
+			  AND s.operation_time <![CDATA[>=]]> #{startTime}
+			  AND s.operation_time <![CDATA[<]]> #{endTime}
+			GROUP BY COALESCE(NULLIF(TRIM(bg.brand), ''), '未标注品牌')
+			</script>
+			""")
+	List<BrandAmountAgg> brandGrossProfitPart(@Param("startTime") LocalDateTime startTime,
+									   @Param("endTime") LocalDateTime endTime);
+
+	@Select("""
+			<script>
+			SELECT DATE(s.operation_time) AS stat_date,
+			       SUM(s.total_price) AS amount
+			FROM biz_sales s
+			WHERE s.is_deleted = 0
+			  AND s.biz_status = 1
+			  AND s.operation_time <![CDATA[>=]]> #{startTime}
+			  AND s.operation_time <![CDATA[<]]> #{endTime}
+			GROUP BY DATE(s.operation_time)
+			ORDER BY DATE(s.operation_time)
+			</script>
+			""")
+	List<DailyAmountAgg> dailyValidSalesAmount(@Param("startTime") LocalDateTime startTime,
+								   @Param("endTime") LocalDateTime endTime);
+
+	@Select("""
+			<script>
+			SELECT DATE(s.operation_time) AS stat_date,
+			       SUM(COALESCE(s.cost_total_price, 0)) AS amount
+			FROM biz_sales s
+			WHERE s.is_deleted = 0
+			  AND s.biz_status = 1
+			  AND s.operation_time <![CDATA[>=]]> #{startTime}
+			  AND s.operation_time <![CDATA[<]]> #{endTime}
+			GROUP BY DATE(s.operation_time)
+			ORDER BY DATE(s.operation_time)
+			</script>
+			""")
+	List<DailyAmountAgg> dailyEstimatedSalesCost(@Param("startTime") LocalDateTime startTime,
+									 @Param("endTime") LocalDateTime endTime);
 
 	class TopGoodsAgg {
 		private String name;

@@ -14,6 +14,7 @@ import org.example.back.entity.BaseGoods;
 import org.example.back.entity.BizSales;
 import org.example.back.entity.BizSalesReturn;
 import org.example.back.mapper.BaseGoodsMapper;
+import org.example.back.mapper.BizPurchaseMapper;
 import org.example.back.mapper.BizSalesMapper;
 import org.example.back.mapper.BizSalesReturnMapper;
 import org.example.back.vo.SalesSourceOptionVO;
@@ -42,6 +43,9 @@ public class SalesService {
 
     @Autowired
     private BizSalesReturnMapper bizSalesReturnMapper;
+
+    @Autowired
+    private BizPurchaseMapper bizPurchaseMapper;
 
     @Autowired
     private AuthService authService;
@@ -121,6 +125,7 @@ public class SalesService {
         ensureGoodsEnabled(goods);
         BigDecimal unitPrice = resolveUnitPrice(dto.getUnitPrice(), goods.getSalePrice(), "商品售价为空，请传入销售单价");
         LocalDateTime operationTime = dto.getOperationTime() == null ? LocalDateTime.now() : dto.getOperationTime();
+        CostSnapshot costSnapshot = buildSalesCostSnapshot(goods.getId(), operationTime, goods.getPurchasePrice());
 
         LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
 
@@ -130,6 +135,9 @@ public class SalesService {
         entity.setGoodsName(goods.getGoodsName());
         entity.setQuantity(dto.getQuantity());
         entity.setUnitPrice(unitPrice);
+        entity.setCostUnitPrice(costSnapshot.unitPrice());
+        entity.setCostTotalPrice(costSnapshot.unitPrice().multiply(BigDecimal.valueOf(dto.getQuantity())));
+        entity.setCostSource(costSnapshot.source());
         entity.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(dto.getQuantity())));
         entity.setOperatorId(loginUser.getId());
         entity.setOperatorName(loginUser.getRealName());
@@ -172,6 +180,9 @@ public class SalesService {
             redFlushDoc.setGoodsName(entity.getGoodsName());
             redFlushDoc.setQuantity(-entity.getQuantity());
             redFlushDoc.setUnitPrice(entity.getUnitPrice());
+            redFlushDoc.setCostUnitPrice(entity.getCostUnitPrice());
+            redFlushDoc.setCostTotalPrice(entity.getCostTotalPrice() == null ? null : entity.getCostTotalPrice().negate());
+            redFlushDoc.setCostSource(entity.getCostSource());
             redFlushDoc.setTotalPrice(entity.getTotalPrice().negate());
             redFlushDoc.setOperatorId(loginUser.getId());
             redFlushDoc.setOperatorName(loginUser.getRealName());
@@ -249,6 +260,17 @@ public class SalesService {
         return finalPrice;
     }
 
+    private CostSnapshot buildSalesCostSnapshot(Long goodsId, LocalDateTime bizTime, BigDecimal fallbackPurchasePrice) {
+        BigDecimal purchasePrice = bizPurchaseMapper.latestValidUnitPrice(goodsId, bizTime);
+        if (purchasePrice != null && purchasePrice.compareTo(BigDecimal.ZERO) > 0) {
+            return new CostSnapshot(purchasePrice, "RECENT_PURCHASE");
+        }
+        if (fallbackPurchasePrice != null && fallbackPurchasePrice.compareTo(BigDecimal.ZERO) > 0) {
+            return new CostSnapshot(fallbackPurchasePrice, "GOODS_PRICE");
+        }
+        return new CostSnapshot(BigDecimal.ZERO, "ZERO_FALLBACK");
+    }
+
     private void increaseStock(Long goodsId, Integer quantity) {
         LambdaUpdateWrapper<BaseGoods> wrapper = new LambdaUpdateWrapper<>();
         wrapper.eq(BaseGoods::getId, goodsId)
@@ -284,5 +306,8 @@ public class SalesService {
         vo.setVoidTime(entity.getVoidTime());
         vo.setVoidReason(entity.getVoidReason());
         return vo;
+    }
+
+    private record CostSnapshot(BigDecimal unitPrice, String source) {
     }
 }

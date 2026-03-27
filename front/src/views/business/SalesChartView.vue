@@ -1,28 +1,94 @@
 <template>
   <div class="chart-container">
+    <el-card shadow="never" class="mode-card">
+      <div class="mode-switch">
+        <span class="mode-label">统计视角</span>
+        <el-radio-group v-model="viewMode" @change="fetchData">
+          <el-radio-button label="sales">销售视角</el-radio-button>
+          <el-radio-button label="profit">毛利视角</el-radio-button>
+        </el-radio-group>
+      </div>
+      <el-collapse
+        v-if="viewMode === 'profit'"
+        v-model="profitExplainActiveNames"
+        class="profit-explain-collapse"
+      >
+        <el-collapse-item name="profit-rule">
+          <template #title>
+            <div class="profit-title-wrap">
+              <span class="profit-title-text">查看毛利计算规则</span>
+              <el-tag type="success" size="small" effect="light">建议阅读</el-tag>
+            </div>
+          </template>
+
+          <p v-if="Number(profitOverview.grossProfitAmount || 0) < 0" class="loss-warning">
+            当前区间存在亏损
+          </p>
+
+          <p class="profit-explain-line scope">
+            <span class="line-tag">范围</span>
+            只统计已生效且未删除，并在所选时间内的销售单和销售退货单。
+          </p>
+          <p class="profit-explain-line sales">净销售额 = 销售总额 - 客退总额</p>
+          <p class="profit-explain-line cost">快照成本 = 销售成本 - 客退成本（按开单时记录的成本）</p>
+          <p class="profit-explain-line profit">毛利额 = 净销售额 - 快照成本</p>
+          <p class="profit-explain-line rate">毛利率 = 毛利额 / 净销售额 × 100%（净销售额为 0 时按 0 处理）</p>
+        </el-collapse-item>
+      </el-collapse>
+    </el-card>
+
     <el-row :gutter="16" style="margin-bottom: 20px;">
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col v-if="viewMode === 'sales'" :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="summary-card">
           <div class="summary-label">销售总额</div>
           <div class="summary-value">{{ formatCurrency(overview.salesAmount) }}</div>
         </el-card>
       </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col v-if="viewMode === 'sales'" :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="summary-card">
           <div class="summary-label">退货总额</div>
           <div class="summary-value warning">{{ formatCurrency(overview.returnAmount) }}</div>
         </el-card>
       </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col v-if="viewMode === 'sales'" :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="summary-card">
           <div class="summary-label">净销售额</div>
           <div class="summary-value success">{{ formatCurrency(overview.netSalesAmount) }}</div>
         </el-card>
       </el-col>
-      <el-col :xs="24" :sm="12" :md="6">
+      <el-col v-if="viewMode === 'sales'" :xs="24" :sm="12" :md="6">
         <el-card shadow="hover" class="summary-card">
           <div class="summary-label">销售/退货数量</div>
           <div class="summary-value">{{ overview.salesQuantity }} / {{ overview.returnQuantity }}</div>
+        </el-card>
+      </el-col>
+
+      <el-col v-if="viewMode === 'profit'" :xs="24" :sm="12" :md="6">
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-label">净销售额</div>
+          <div class="summary-value">{{ formatCurrency(profitOverview.netSalesAmount) }}</div>
+        </el-card>
+      </el-col>
+      <el-col v-if="viewMode === 'profit'" :xs="24" :sm="12" :md="6">
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-label">快照成本</div>
+          <div class="summary-value warning">{{ formatCurrency(profitOverview.estimatedCost) }}</div>
+        </el-card>
+      </el-col>
+      <el-col v-if="viewMode === 'profit'" :xs="24" :sm="12" :md="6">
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-label">毛利额</div>
+          <div class="summary-value" :class="profitOverview.grossProfitAmount >= 0 ? 'success' : 'danger'">
+            {{ formatCurrency(profitOverview.grossProfitAmount) }}
+          </div>
+        </el-card>
+      </el-col>
+      <el-col v-if="viewMode === 'profit'" :xs="24" :sm="12" :md="6">
+        <el-card shadow="hover" class="summary-card">
+          <div class="summary-label">毛利率</div>
+          <div class="summary-value" :class="profitOverview.grossProfitRate >= 0 ? 'success' : 'danger'">
+            {{ formatRate(profitOverview.grossProfitRate) }}
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -52,12 +118,12 @@
     </el-card>
 
     <el-row :gutter="20">
-      <el-col :span="12">
+      <el-col :xs="24" :md="12">
         <el-card>
           <div ref="barChartRef" style="height: 350px;"></div>
         </el-card>
       </el-col>
-      <el-col :span="12">
+      <el-col :xs="24" :md="12">
         <el-card>
           <div ref="pieChartRef" style="height: 350px;"></div>
         </el-card>
@@ -82,9 +148,14 @@ import {
   getChartOverviewAPI,
   getChartTop5API,
   getChartBrandRatioAPI,
-  getChartDailyTrendAPI
+  getChartDailyTrendAPI,
+  getChartProfitOverviewAPI,
+  getChartProfitBrandTopAPI,
+  getChartProfitDailyTrendAPI
 } from '@/api/business'
 
+const viewMode = ref('sales')
+const profitExplainActiveNames = ref([])
 const dateRange = ref([])
 const loading = ref(false)
 const barChartRef = ref(null)
@@ -98,10 +169,18 @@ const overview = ref({
   salesQuantity: 0,
   returnQuantity: 0
 })
-
 const top5Data = ref({ nameList: [], dataList: [] })
 const brandRatioData = ref([])
 const trendData = ref({ dateList: [], amountList: [] })
+
+const profitOverview = ref({
+  netSalesAmount: 0,
+  estimatedCost: 0,
+  grossProfitAmount: 0,
+  grossProfitRate: 0
+})
+const profitTopData = ref({ nameList: [], dataList: [] })
+const profitTrendData = ref({ dateList: [], amountList: [] })
 
 let barChart = null
 let pieChart = null
@@ -117,16 +196,21 @@ const initCharts = async () => {
   if (lineChartRef.value) lineChart = echarts.init(lineChartRef.value)
 
   updateCharts()
-
   window.addEventListener('resize', handleResize)
 }
 
 const updateCharts = () => {
+  if (viewMode.value === 'profit') {
+    updateProfitCharts()
+    return
+  }
+  updateSalesCharts()
+}
+
+const updateSalesCharts = () => {
   const names = top5Data.value.nameList?.length ? top5Data.value.nameList : ['暂无数据']
   const quantities = top5Data.value.dataList?.length ? top5Data.value.dataList : [0]
-
   const brandList = brandRatioData.value?.length ? brandRatioData.value : [{ name: '暂无数据', value: 0 }]
-
   const trendDates = trendData.value.dateList?.length ? trendData.value.dateList : ['暂无数据']
   const trendAmounts = trendData.value.amountList?.length ? trendData.value.amountList : [0]
 
@@ -175,7 +259,6 @@ const updateCharts = () => {
       series: [{
         name: '销售额',
         type: 'line',
-        stack: 'Total',
         data: trendAmounts,
         smooth: true,
         areaStyle: {},
@@ -183,6 +266,87 @@ const updateCharts = () => {
       }]
     })
   }
+}
+
+const updateProfitCharts = () => {
+  const names = profitTopData.value.nameList?.length ? profitTopData.value.nameList : ['暂无数据']
+  const profits = toNumberArray(profitTopData.value.dataList?.length ? profitTopData.value.dataList : [0])
+  const trendDates = profitTrendData.value.dateList?.length ? profitTrendData.value.dateList : ['暂无数据']
+  const trendAmounts = toNumberArray(profitTrendData.value.amountList?.length ? profitTrendData.value.amountList : [0])
+  const pieData = buildProfitPieData()
+
+  if (barChart) {
+    barChart.setOption({
+      title: { text: '品牌毛利 TOP5', left: 'center' },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: { type: 'category', data: names },
+      yAxis: { type: 'value', name: '金额(元)' },
+      series: [{
+        name: '毛利额',
+        type: 'bar',
+        barWidth: '40%',
+        data: profits,
+        itemStyle: { color: '#E67E22' }
+      }]
+    })
+  }
+
+  if (pieChart) {
+    pieChart.setOption({
+      title: { text: '毛利结构', left: 'center' },
+      tooltip: { trigger: 'item', formatter: '{a} <br/>{b} : {c}元 ({d}%)' },
+      legend: { orient: 'vertical', left: 'left' },
+      series: [{
+        name: '金额',
+        type: 'pie',
+        radius: '60%',
+        center: ['50%', '55%'],
+        data: pieData,
+        emphasis: {
+          itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' }
+        }
+      }]
+    })
+  }
+
+  if (lineChart) {
+    lineChart.setOption({
+      title: { text: '毛利额走势', left: 'center' },
+      tooltip: { trigger: 'axis' },
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      xAxis: { type: 'category', boundaryGap: false, data: trendDates },
+      yAxis: { type: 'value', name: '金额(元)' },
+      series: [{
+        name: '毛利额',
+        type: 'line',
+        data: trendAmounts,
+        smooth: true,
+        areaStyle: {},
+        itemStyle: { color: '#F56C6C' }
+      }]
+    })
+  }
+}
+
+const buildProfitPieData = () => {
+  const netSales = Number(profitOverview.value.netSalesAmount || 0)
+  const estimatedCost = Number(profitOverview.value.estimatedCost || 0)
+  const grossProfit = Number(profitOverview.value.grossProfitAmount || 0)
+
+  if (grossProfit >= 0) {
+    const data = [
+      { name: '快照成本', value: Math.max(estimatedCost, 0) },
+      { name: '毛利额', value: Math.max(grossProfit, 0) }
+    ].filter((item) => item.value > 0)
+    return data.length ? data : [{ name: '暂无数据', value: 0 }]
+  }
+
+  const data = [
+    { name: '净销售额', value: Math.max(netSales, 0) },
+    { name: '亏损额', value: Math.abs(grossProfit) }
+  ].filter((item) => item.value > 0)
+  return data.length ? data : [{ name: '暂无数据', value: 0 }]
 }
 
 const handleResize = () => {
@@ -205,23 +369,41 @@ const fetchData = async () => {
   loading.value = true
   try {
     const params = buildParams()
-    const [overviewRes, top5Res, brandRes, trendRes] = await Promise.all([
-      getChartOverviewAPI(params),
-      getChartTop5API(params),
-      getChartBrandRatioAPI(params),
-      getChartDailyTrendAPI(params)
-    ])
 
-    overview.value = overviewRes?.data || {
-      salesAmount: 0,
-      returnAmount: 0,
-      netSalesAmount: 0,
-      salesQuantity: 0,
-      returnQuantity: 0
+    if (viewMode.value === 'profit') {
+      const [profitOverviewRes, profitTopRes, profitTrendRes] = await Promise.all([
+        getChartProfitOverviewAPI(params),
+        getChartProfitBrandTopAPI(params),
+        getChartProfitDailyTrendAPI(params)
+      ])
+
+      profitOverview.value = profitOverviewRes?.data || {
+        netSalesAmount: 0,
+        estimatedCost: 0,
+        grossProfitAmount: 0,
+        grossProfitRate: 0
+      }
+      profitTopData.value = profitTopRes?.data || { nameList: [], dataList: [] }
+      profitTrendData.value = profitTrendRes?.data || { dateList: [], amountList: [] }
+    } else {
+      const [overviewRes, top5Res, brandRes, trendRes] = await Promise.all([
+        getChartOverviewAPI(params),
+        getChartTop5API(params),
+        getChartBrandRatioAPI(params),
+        getChartDailyTrendAPI(params)
+      ])
+
+      overview.value = overviewRes?.data || {
+        salesAmount: 0,
+        returnAmount: 0,
+        netSalesAmount: 0,
+        salesQuantity: 0,
+        returnQuantity: 0
+      }
+      top5Data.value = top5Res?.data || { nameList: [], dataList: [] }
+      brandRatioData.value = Array.isArray(brandRes?.data) ? brandRes.data : []
+      trendData.value = trendRes?.data || { dateList: [], amountList: [] }
     }
-    top5Data.value = top5Res?.data || { nameList: [], dataList: [] }
-    brandRatioData.value = Array.isArray(brandRes?.data) ? brandRes.data : []
-    trendData.value = trendRes?.data || { dateList: [], amountList: [] }
 
     updateCharts()
     ElMessage.success('图表数据刷新成功')
@@ -241,6 +423,13 @@ const formatCurrency = (value) => {
   const num = Number(value || 0)
   return `￥${num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
+
+const formatRate = (value) => {
+  const num = Number(value || 0)
+  return `${num.toFixed(2)}%`
+}
+
+const toNumberArray = (arr) => arr.map((item) => Number(item || 0))
 
 onMounted(() => {
   nextTick(async () => {
@@ -265,26 +454,130 @@ onBeforeUnmount(() => {
 .chart-container {
   padding: 10px;
 }
+
+.mode-card {
+  margin-bottom: 16px;
+}
+
+.mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mode-label {
+  color: #606266;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profit-explain-collapse {
+  margin-top: 10px;
+}
+
+.profit-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profit-title-text {
+  color: #1f2d3d;
+  font-weight: 600;
+}
+
+:deep(.profit-explain-collapse .el-collapse-item__header) {
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: #f5f9ff;
+  border: 1px solid #d9ecff;
+}
+
+:deep(.profit-explain-collapse .el-collapse-item__wrap) {
+  border: 1px solid #e4e7ed;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+}
+
+.loss-warning {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.profit-explain-line {
+  margin: 6px 0;
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.profit-explain-line .line-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #606266;
+  background: #f2f6fc;
+  font-size: 12px;
+}
+
+.profit-explain-line.sales {
+  color: #1d4ed8;
+}
+
+.profit-explain-line.cost {
+  color: #b45309;
+}
+
+.profit-explain-line.profit {
+  color: #047857;
+  font-weight: 600;
+}
+
+.profit-explain-line.rate {
+  color: #7c3aed;
+}
+
+.profit-explain-line.scope {
+  color: #4b5563;
+}
+
 .card-header {
   font-weight: bold;
 }
+
 .summary-card {
   margin-bottom: 12px;
 }
+
 .summary-label {
   color: #909399;
   font-size: 13px;
 }
+
 .summary-value {
   margin-top: 8px;
   font-size: 22px;
   font-weight: 700;
   color: #303133;
 }
+
 .summary-value.success {
   color: #67c23a;
 }
+
 .summary-value.warning {
   color: #e6a23c;
+}
+
+.summary-value.danger {
+  color: #f56c6c;
 }
 </style>

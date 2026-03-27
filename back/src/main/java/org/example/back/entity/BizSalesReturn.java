@@ -30,6 +30,21 @@ public class BizSalesReturn {
 
     private BigDecimal unitPrice;
 
+    /**
+     * 成本单价快照
+     */
+    private BigDecimal costUnitPrice;
+
+    /**
+     * 成本总额快照
+     */
+    private BigDecimal costTotalPrice;
+
+    /**
+     * 成本来源: SOURCE_SALE/RECENT_PURCHASE/GOODS_PRICE/ZERO_FALLBACK
+     */
+    private String costSource;
+
     private BigDecimal totalPrice;
 
     private Long operatorId;

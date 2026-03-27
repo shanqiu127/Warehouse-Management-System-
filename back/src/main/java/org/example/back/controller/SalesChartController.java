@@ -5,6 +5,9 @@ import org.example.back.dto.SalesChartQueryDTO;
 import org.example.back.service.SalesChartService;
 import org.example.back.vo.BrandRatioItemVO;
 import org.example.back.vo.ChartOverviewVO;
+import org.example.back.vo.ProfitBrandTopVO;
+import org.example.back.vo.ProfitOverviewVO;
+import org.example.back.vo.ProfitTrendVO;
 import org.example.back.vo.SalesTop5VO;
 import org.example.back.vo.SalesTrendVO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,5 +42,20 @@ public class SalesChartController {
     @GetMapping("/daily-trend")
     public Result<SalesTrendVO> dailyTrend(SalesChartQueryDTO queryDTO) {
         return Result.success(salesChartService.getDailyTrend(queryDTO));
+    }
+
+    @GetMapping("/profit-overview")
+    public Result<ProfitOverviewVO> profitOverview(SalesChartQueryDTO queryDTO) {
+        return Result.success(salesChartService.getProfitOverview(queryDTO));
+    }
+
+    @GetMapping("/profit-brand-top")
+    public Result<ProfitBrandTopVO> profitBrandTop(SalesChartQueryDTO queryDTO) {
+        return Result.success(salesChartService.getProfitBrandTop(queryDTO));
+    }
+
+    @GetMapping("/profit-daily-trend")
+    public Result<ProfitTrendVO> profitDailyTrend(SalesChartQueryDTO queryDTO) {
+        return Result.success(salesChartService.getProfitDailyTrend(queryDTO));
     }
 }

@@ -259,6 +259,7 @@ CREATE TABLE `biz_purchase` (
     UNIQUE KEY `uk_purchase_no` (`purchase_no`),
     KEY `idx_goods_id` (`goods_id`),
     KEY `idx_goods_time` (`goods_id`, `operation_time`),
+    KEY `idx_goods_status_time` (`goods_id`, `biz_status`, `is_deleted`, `operation_time`, `id`),
     KEY `idx_biz_status` (`biz_status`),
     KEY `idx_source_id` (`source_id`),
     KEY `idx_operator_id` (`operator_id`),
@@ -296,6 +297,7 @@ CREATE TABLE `biz_purchase_return` (
     KEY `idx_source_purchase_no` (`source_purchase_no`),
     KEY `idx_goods_id` (`goods_id`),
     KEY `idx_goods_time` (`goods_id`, `operation_time`),
+    KEY `idx_stat_time_status` (`operation_time`, `biz_status`, `is_deleted`, `goods_id`),
     KEY `idx_biz_status` (`biz_status`),
     KEY `idx_source_id` (`source_id`),
     KEY `idx_operator_id` (`operator_id`),
@@ -313,6 +315,9 @@ CREATE TABLE `biz_sales` (
     `goods_name` VARCHAR(100) DEFAULT NULL COMMENT '商品名称(冗余字段)',
     `quantity` INT NOT NULL COMMENT '销售数量',
     `unit_price` DECIMAL(10,2) NOT NULL COMMENT '销售单价',
+    `cost_unit_price` DECIMAL(10,2) DEFAULT NULL COMMENT '成本单价快照',
+    `cost_total_price` DECIMAL(12,2) DEFAULT NULL COMMENT '成本总额快照',
+    `cost_source` VARCHAR(30) DEFAULT NULL COMMENT '成本来源: RECENT_PURCHASE/GOODS_PRICE/ZERO_FALLBACK',
     `total_price` DECIMAL(10,2) NOT NULL COMMENT '总金额',
     `operator_id` BIGINT DEFAULT NULL COMMENT '操作人ID',
     `operator_name` VARCHAR(50) DEFAULT NULL COMMENT '操作人姓名(冗余字段)',
@@ -329,6 +334,8 @@ CREATE TABLE `biz_sales` (
     UNIQUE KEY `uk_sales_no` (`sales_no`),
     KEY `idx_goods_id` (`goods_id`),
     KEY `idx_goods_time` (`goods_id`, `operation_time`),
+    KEY `idx_stat_time_status` (`operation_time`, `biz_status`, `is_deleted`, `goods_id`),
+    KEY `idx_cost_stat` (`operation_time`, `biz_status`, `is_deleted`, `cost_total_price`),
     KEY `idx_biz_status` (`biz_status`),
     KEY `idx_source_id` (`source_id`),
     KEY `idx_operator_id` (`operator_id`),
@@ -348,6 +355,9 @@ CREATE TABLE `biz_sales_return` (
     `goods_name` VARCHAR(100) DEFAULT NULL COMMENT '商品名称(冗余字段)',
     `quantity` INT NOT NULL COMMENT '退货数量',
     `unit_price` DECIMAL(10,2) NOT NULL COMMENT '退货单价',
+    `cost_unit_price` DECIMAL(10,2) DEFAULT NULL COMMENT '成本单价快照',
+    `cost_total_price` DECIMAL(12,2) DEFAULT NULL COMMENT '成本总额快照',
+    `cost_source` VARCHAR(30) DEFAULT NULL COMMENT '成本来源: SOURCE_SALE/RECENT_PURCHASE/GOODS_PRICE/ZERO_FALLBACK',
     `total_price` DECIMAL(10,2) NOT NULL COMMENT '总金额',
     `operator_id` BIGINT DEFAULT NULL COMMENT '操作人ID',
     `operator_name` VARCHAR(50) DEFAULT NULL COMMENT '操作人姓名(冗余字段)',
@@ -364,6 +374,8 @@ CREATE TABLE `biz_sales_return` (
     UNIQUE KEY `uk_return_no` (`return_no`),
     KEY `idx_goods_id` (`goods_id`),
     KEY `idx_goods_time` (`goods_id`, `operation_time`),
+    KEY `idx_stat_time_status` (`operation_time`, `biz_status`, `is_deleted`, `goods_id`, `source_sales_id`),
+    KEY `idx_cost_stat` (`operation_time`, `biz_status`, `is_deleted`, `cost_total_price`),
     KEY `idx_source_sales_id` (`source_sales_id`),
     KEY `idx_source_sales_no` (`source_sales_no`),
     KEY `idx_biz_status` (`biz_status`),
@@ -477,6 +489,139 @@ INSERT INTO `biz_sales_return` (`return_no`, `source_sales_id`, `source_sales_no
 ('CSTRET202501001', 1, 'SAL202501001', 3, '华为Mate60', 1, 5999.0, 5999.00, 4, '李四', '2025-01-20 10:00:00', '质量问题退货'),
 ('CSTRET202501002', 2, 'SAL202501002', 4, '小米14 Pro', 1, 4999.0, 4999.00, 4, '李四', '2025-01-20 11:00:00', '质量问题退货'),
 ('CSTRET202502001', 5, 'SAL202501005', 8, '华为FreeBuds', 2, 499.0, 998.00, 4, '李四', '2025-02-20 10:00:00', '客户退货');
+
+-- 4.9.1 初始化成本快照字段（V2.2）
+-- 销售单：按销售时间回溯最近有效进货价，兜底商品进价
+UPDATE `biz_sales` s
+LEFT JOIN `base_goods` bg ON bg.id = s.goods_id
+SET
+        s.cost_unit_price = COALESCE(
+                (
+                        SELECT p.unit_price
+                        FROM `biz_purchase` p
+                        WHERE p.goods_id = s.goods_id
+                            AND p.is_deleted = 0
+                            AND p.biz_status = 1
+                            AND p.operation_time <= s.operation_time
+                        ORDER BY p.operation_time DESC, p.id DESC
+                        LIMIT 1
+                ),
+                bg.purchase_price,
+                0
+        ),
+        s.cost_total_price = ROUND(
+                s.quantity * COALESCE(
+                        (
+                                SELECT p.unit_price
+                                FROM `biz_purchase` p
+                                WHERE p.goods_id = s.goods_id
+                                    AND p.is_deleted = 0
+                                    AND p.biz_status = 1
+                                    AND p.operation_time <= s.operation_time
+                                ORDER BY p.operation_time DESC, p.id DESC
+                                LIMIT 1
+                        ),
+                        bg.purchase_price,
+                        0
+                ),
+                2
+        ),
+        s.cost_source = CASE
+                WHEN (
+                        SELECT p.unit_price
+                        FROM `biz_purchase` p
+                        WHERE p.goods_id = s.goods_id
+                            AND p.is_deleted = 0
+                            AND p.biz_status = 1
+                            AND p.operation_time <= s.operation_time
+                        ORDER BY p.operation_time DESC, p.id DESC
+                        LIMIT 1
+                ) IS NOT NULL THEN 'RECENT_PURCHASE'
+                WHEN bg.purchase_price IS NOT NULL THEN 'GOODS_PRICE'
+                ELSE 'ZERO_FALLBACK'
+        END
+WHERE s.is_deleted = 0;
+
+-- 客退单：优先继承来源销售成本快照，兜底最近进货价/商品进价
+UPDATE `biz_sales_return` r
+LEFT JOIN `biz_sales` s ON s.id = r.source_sales_id
+LEFT JOIN `base_goods` bg ON bg.id = r.goods_id
+SET
+        r.cost_unit_price = COALESCE(
+                s.cost_unit_price,
+                (
+                        SELECT p.unit_price
+                        FROM `biz_purchase` p
+                        WHERE p.goods_id = r.goods_id
+                            AND p.is_deleted = 0
+                            AND p.biz_status = 1
+                            AND p.operation_time <= COALESCE(s.operation_time, r.operation_time)
+                        ORDER BY p.operation_time DESC, p.id DESC
+                        LIMIT 1
+                ),
+                bg.purchase_price,
+                0
+        ),
+        r.cost_total_price = ROUND(
+                r.quantity * COALESCE(
+                        s.cost_unit_price,
+                        (
+                                SELECT p.unit_price
+                                FROM `biz_purchase` p
+                                WHERE p.goods_id = r.goods_id
+                                    AND p.is_deleted = 0
+                                    AND p.biz_status = 1
+                                    AND p.operation_time <= COALESCE(s.operation_time, r.operation_time)
+                                ORDER BY p.operation_time DESC, p.id DESC
+                                LIMIT 1
+                        ),
+                        bg.purchase_price,
+                        0
+                ),
+                2
+        ),
+        r.cost_source = CASE
+                WHEN s.cost_unit_price IS NOT NULL THEN 'SOURCE_SALE'
+                WHEN (
+                        SELECT p.unit_price
+                        FROM `biz_purchase` p
+                        WHERE p.goods_id = r.goods_id
+                            AND p.is_deleted = 0
+                            AND p.biz_status = 1
+                            AND p.operation_time <= COALESCE(s.operation_time, r.operation_time)
+                        ORDER BY p.operation_time DESC, p.id DESC
+                        LIMIT 1
+                ) IS NOT NULL THEN 'RECENT_PURCHASE'
+                WHEN bg.purchase_price IS NOT NULL THEN 'GOODS_PRICE'
+                ELSE 'ZERO_FALLBACK'
+        END
+WHERE r.is_deleted = 0;
+
+-- 成本快照覆盖率校验（应返回 0）
+SELECT 'biz_sales' AS table_name,
+             COUNT(*) AS missing_count
+FROM `biz_sales`
+WHERE is_deleted = 0
+    AND (cost_unit_price IS NULL OR cost_total_price IS NULL OR cost_source IS NULL)
+UNION ALL
+SELECT 'biz_sales_return' AS table_name,
+             COUNT(*) AS missing_count
+FROM `biz_sales_return`
+WHERE is_deleted = 0
+    AND (cost_unit_price IS NULL OR cost_total_price IS NULL OR cost_source IS NULL);
+
+-- 4.9.2 可选严格模式（S4）
+-- 仅当上方 missing_count 均为 0 时再启用。
+-- 如需启用，请取消注释后执行。
+-- ALTER TABLE `biz_sales`
+-- MODIFY COLUMN `cost_unit_price` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+-- MODIFY COLUMN `cost_total_price` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+-- MODIFY COLUMN `cost_source` VARCHAR(30) NOT NULL DEFAULT 'ZERO_FALLBACK';
+--
+-- ALTER TABLE `biz_sales_return`
+-- MODIFY COLUMN `cost_unit_price` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+-- MODIFY COLUMN `cost_total_price` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+-- MODIFY COLUMN `cost_source` VARCHAR(30) NOT NULL DEFAULT 'ZERO_FALLBACK';
 
 -- 4.10 初始化公告数据
 INSERT INTO `sys_notice` (`title`, `content`, `publisher`, `publish_time`, `status`) VALUES
