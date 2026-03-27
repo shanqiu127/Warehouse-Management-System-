@@ -25,7 +25,7 @@
           <el-form-item>
             <el-button type="primary" @click="handleSearch">查询</el-button>
             <el-button @click="resetSearch">重置</el-button>
-            <el-button v-permission="['admin']" type="success" @click="handleAdd">新建销售单</el-button>
+            <el-button v-permission="['admin', 'employee']" type="success" @click="handleAdd">新建销售单</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -46,7 +46,7 @@
               <el-button size="small" type="primary" link @click="handleView(scope.row)">查看</el-button>
               <el-button
                 v-if="scope.row?.__uiDeleted"
-                v-permission="['admin']"
+                v-permission="['admin', 'employee']"
                 size="small"
                 type="danger"
                 link
@@ -56,7 +56,7 @@
               </el-button>
               <el-button
                 v-else-if="canDelete(scope.row)"
-                v-permission="['admin']"
+                v-permission="['admin', 'employee']"
                 size="small"
                 type="danger"
                 link
@@ -66,7 +66,7 @@
               </el-button>
               <template v-else>
               <el-button
-                v-permission="['admin']"
+                v-permission="['admin', 'employee']"
                 size="small"
                 type="warning"
                 link
@@ -76,7 +76,7 @@
                 仅作废
               </el-button>
               <el-button
-                v-permission="['admin']"
+                v-permission="['admin', 'employee']"
                 size="small"
                 type="danger"
                 link

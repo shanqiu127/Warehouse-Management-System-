@@ -12,7 +12,7 @@
       <el-form-item>
         <el-button type="primary" @click="handleSearch">查询</el-button>
         <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd" v-permission="['admin']">新增商品</el-button>
+        <el-button type="success" @click="handleAdd" v-permission="['admin', 'employee']">新增商品</el-button>
       </el-form-item>
     </el-form>
 
@@ -31,12 +31,12 @@
       </el-table-column>
       <el-table-column prop="warningStock" label="预警阈值" width="100" />
       
-      <!-- 普通员工仅可见查看，隐藏操作列的修改与删除 -->
+      <!-- 员工与管理员均可执行增删改操作 -->
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="scope">
           <el-button size="small" @click="handleView(scope.row)">详情</el-button>
-          <el-button size="small" type="primary" @click="handleEdit(scope.row)" v-permission="['admin']">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)" v-permission="['admin']">删除</el-button>
+          <el-button size="small" type="primary" @click="handleEdit(scope.row)" v-permission="['admin', 'employee']">编辑</el-button>
+          <el-button size="small" type="danger" @click="handleDelete(scope.row)" v-permission="['admin', 'employee']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

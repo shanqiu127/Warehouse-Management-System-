@@ -63,21 +63,21 @@
         <section class="quick-actions card-glass">
           <h2>Quick Actions</h2>
           <div class="actions-wrapper">
-            <div class="action-btn" @click="go('/business/sales')">
-              <div class="icon-wrap bg-blue"><div class="circle"></div></div>
-              <span>Sales Order</span>
-            </div>
-            <div class="action-btn" @click="go('/business/purchase')">
-              <div class="icon-wrap bg-purple"><div class="circle"></div></div>
-              <span>Purchase</span>
-            </div>
             <div class="action-btn" @click="go('/business/sales-chart')">
-              <div class="icon-wrap bg-orange"><div class="circle"></div></div>
+              <div class="icon-wrap bg-blue"><div class="circle"></div></div>
               <span>Analytics</span>
             </div>
+            <div class="action-btn" @click="go('/system/notice')">
+              <div class="icon-wrap bg-purple"><div class="circle"></div></div>
+              <span>Notices</span>
+            </div>
             <div class="action-btn" @click="go('/system/user')">
-              <div class="icon-wrap bg-green"><div class="circle"></div></div>
+              <div class="icon-wrap bg-orange"><div class="circle"></div></div>
               <span>Users</span>
+            </div>
+            <div class="action-btn" @click="go('/system/employee')">
+              <div class="icon-wrap bg-green"><div class="circle"></div></div>
+              <span>Employees</span>
             </div>
           </div>
         </section>

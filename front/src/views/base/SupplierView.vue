@@ -10,7 +10,7 @@
       <el-form-item>
         <el-button type="primary" @click="handleSearch">查询</el-button>
         <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd" v-permission="['admin']">新增供应商</el-button>
+        <el-button type="success" @click="handleAdd" v-permission="['admin', 'employee']">新增供应商</el-button>
       </el-form-item>
     </el-form>
 
@@ -20,12 +20,12 @@
       <el-table-column prop="contact" label="联系人" width="120" />
       <el-table-column prop="phone" label="联系电话" width="150" />
       <el-table-column prop="address" label="联系地址" />
-      <!-- 普通员工仅可见查看，隐藏操作列的修改与删除 -->
+      <!-- 员工与管理员均可执行增删改操作 -->
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="scope">
           <el-button size="small" @click="handleView(scope.row)">查看</el-button>
-          <el-button size="small" type="primary" @click="handleEdit(scope.row)" v-permission="['admin']">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)" v-permission="['admin']">删除</el-button>
+          <el-button size="small" type="primary" @click="handleEdit(scope.row)" v-permission="['admin', 'employee']">编辑</el-button>
+          <el-button size="small" type="danger" @click="handleDelete(scope.row)" v-permission="['admin', 'employee']">删除</el-button>
         </template>
       </el-table-column>
     </el-table>

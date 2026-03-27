@@ -5,20 +5,20 @@
       <el-menu background-color="#304156" text-color="#fff" router :default-active="$route.path">
         <el-menu-item index="/home">首页</el-menu-item>
         
-        <!-- 业务菜单对 superadmin 隐藏，避免干扰超管专注于系统治理 -->
-        <el-sub-menu index="/base" v-if="!onlySuperAdmin">
+        <!-- 角色分工调整：基础资料/进货/销售仅对普通员工显示 -->
+        <el-sub-menu index="/base" v-if="isEmployeeOnly">
           <template #title>基础资料</template>
           <el-menu-item index="/base/supplier">供应商管理</el-menu-item>
           <el-menu-item index="/base/goods">商品资料管理</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="/purchase" v-if="!onlySuperAdmin">
+        <el-sub-menu index="/purchase" v-if="isEmployeeOnly">
           <template #title>进货</template>
           <el-menu-item index="/business/purchase">商品进货</el-menu-item>
           <el-menu-item index="/business/purchase-return">进货退货单</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="/sales" v-if="!onlySuperAdmin">
+        <el-sub-menu index="/sales" v-if="isEmployeeOnly">
           <template #title>销售</template>
           <el-menu-item index="/business/sales">商品销售</el-menu-item>
           <el-menu-item index="/business/sales-return">销售退货单</el-menu-item>
@@ -78,6 +78,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const isAdminOnly = computed(() => normalizeRole(userStore.role) === 'admin')
+const isEmployeeOnly = computed(() => normalizeRole(userStore.role) === 'employee')
 const onlySuperAdmin = computed(() => isSuperAdmin(userStore.role))
 
 const handleLogout = () => {
