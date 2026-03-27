@@ -39,33 +39,39 @@ const router = createRouter({
         {
           path: "base/supplier",
           name: "BaseSupplier",
-          component: () => import("../views/base/SupplierView.vue")
+          component: () => import("../views/base/SupplierView.vue"),
+          meta: { roles: ['employee'] }
         },
         {
           path: "base/goods",
           name: "BaseGoods",
-          component: () => import("../views/base/GoodsView.vue")
+          component: () => import("../views/base/GoodsView.vue"),
+          meta: { roles: ['employee'] }
         },
         // 业务部分页面
         {
           path: "business/purchase",
           name: "BusinessPurchase",
-          component: () => import("../views/business/PurchaseView.vue")
+          component: () => import("../views/business/PurchaseView.vue"),
+          meta: { roles: ['employee'] }
         },
         {
           path: "business/purchase-return",
           name: "BusinessPurchaseReturn",
-          component: () => import("../views/business/PurchaseReturnView.vue")
+          component: () => import("../views/business/PurchaseReturnView.vue"),
+          meta: { roles: ['employee'] }
         },
         {
           path: "business/sales",
           name: "BusinessSales",
-          component: () => import("../views/business/SalesView.vue")
+          component: () => import("../views/business/SalesView.vue"),
+          meta: { roles: ['employee'] }
         },
         {
           path: "business/sales-return",
           name: "BusinessSalesReturn",
-          component: () => import("../views/business/SalesReturnView.vue")
+          component: () => import("../views/business/SalesReturnView.vue"),
+          meta: { roles: ['employee'] }
         },
         // 统计图表页面
         {
@@ -78,7 +84,7 @@ const router = createRouter({
           path: "business/stock-warning",
           name: "BusinessStockWarning",
           component: () => import("../views/business/StockWarningView.vue"),
-          meta: { roles: ['admin', 'employee'] }
+          meta: { roles: ['employee'] }
         },
         // 以下为动态权限测试页面
         {
@@ -104,6 +110,12 @@ const router = createRouter({
           name: "SystemEmployee",
           component: () => import("../views/system/EmployeeView.vue"),
           meta: { roles: ['admin', 'superadmin'] } 
+        },
+        {
+          path: "system/void-approval",
+          name: "SystemVoidApproval",
+          component: () => import("../views/system/VoidApprovalView.vue"),
+          meta: { roles: ['admin'] }
         },
         {
           path: "system/super-admin",

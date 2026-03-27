@@ -48,13 +48,13 @@
           </div>
         </div>
 
-        <div class="metric-glass card-hover" @click="go('/business/stock-warning')" style="cursor: pointer;">
-          <div class="metric-icon">
+        <div class="metric-glass card-hover" @click="go('/system/void-approval')" style="cursor: pointer;">
+          <div class="metric-icon approval-alert-icon">
             <svg viewBox="0 0 24 24" fill="none" class="icon"><path d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18A2 2 0 0 0 3.55 21H20.45A2 2 0 0 0 22.18 18L13.71 3.86A2 2 0 0 0 10.29 3.86Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
           <div class="metric-content">
-            <p>Stock Alerts</p>
-            <h3>{{ summary.lowStockCount ?? 0 }} / {{ summary.zeroStockCount ?? 0 }}</h3>
+            <p>Pending Approvals</p>
+            <h3>{{ pendingApprovalCount }}</h3>
           </div>
         </div>
       </section>
@@ -66,6 +66,10 @@
             <div class="action-btn" @click="go('/business/sales-chart')">
               <div class="icon-wrap bg-blue"><div class="circle"></div></div>
               <span>Analytics</span>
+            </div>
+            <div class="action-btn" @click="go('/system/void-approval')">
+              <div class="icon-wrap bg-red"><div class="circle"></div></div>
+              <span>Approvals</span>
             </div>
             <div class="action-btn" @click="go('/system/notice')">
               <div class="icon-wrap bg-purple"><div class="circle"></div></div>
@@ -105,7 +109,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
-import { getNoticePageAPI } from '@/api/system'
+import { getApprovalPendingCountAPI, getNoticePageAPI } from '@/api/system'
 
 const router = useRouter()
 const summary = ref({
@@ -119,6 +123,7 @@ const summary = ref({
 })
 const noticeList = ref([])
 const noticeLoading = ref(false)
+const pendingApprovalCount = ref(0)
 
 const roleLabel = 'Administrator'
 
@@ -155,6 +160,17 @@ const loadNotices = async () => {
   }
 }
 
+const loadPendingCount = async () => {
+  try {
+    const res = await getApprovalPendingCountAPI()
+    if (res.code === 200) {
+      pendingApprovalCount.value = Number(res.data || 0)
+    }
+  } catch (error) {
+    ElMessage.error('Failed to load pending approvals')
+  }
+}
+
 const go = (path) => {
   router.push(path)
 }
@@ -162,6 +178,7 @@ const go = (path) => {
 onMounted(() => {
   loadSummary()
   loadNotices()
+  loadPendingCount()
 })
 </script>
 
@@ -307,6 +324,11 @@ onMounted(() => {
   box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 
+.approval-alert-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
 .metric-icon .icon {
   width: 24px;
   height: 24px;
@@ -394,6 +416,7 @@ onMounted(() => {
 .bg-purple { background: #fae8ff; color: #c026d3; }
 .bg-orange { background: #ffedd5; color: #ea580c; }
 .bg-green { background: #d1fae5; color: #059669; }
+.bg-red { background: #fee2e2; color: #dc2626; }
 
 .action-btn span {
   font-weight: 600;

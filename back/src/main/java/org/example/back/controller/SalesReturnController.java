@@ -32,7 +32,6 @@ public class SalesReturnController {
     }
 
     @PostMapping
-    @RequireAdmin("仅管理员可新增客退单")
     @PreventDuplicateSubmit(intervalMs = 1800, message = "请勿重复提交销售退货单")
     public Result<Void> create(@Valid @RequestBody SalesReturnSaveDTO dto) {
         salesReturnService.create(dto);
@@ -41,7 +40,6 @@ public class SalesReturnController {
 
     @DeleteMapping("/{id}")
     @AuditLog(module = "销售退货管理", action = "删除", targetType = "销售退货单")
-    @RequireAdmin("仅管理员可删除客退单")
     @PreventDuplicateSubmit(intervalMs = 1200, message = "删除请求过于频繁，请稍后再试")
     public Result<Void> delete(@PathVariable Long id) {
         salesReturnService.delete(id);

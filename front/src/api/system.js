@@ -26,3 +26,9 @@ export const getEmployeeDetailAPI = (id) => request.get(`/system/employees/${id}
 export const createEmployeeAPI = (data) => request.post('/system/employees', data)
 export const updateEmployeeAPI = (id, data) => request.put(`/system/employees/${id}`, data)
 export const deleteEmployeeAPI = (id) => request.delete(`/system/employees/${id}`)
+
+export const getApprovalOrderPageAPI = (params) => request.get('/system/approval-orders/page', { params })
+export const getApprovalPendingCountAPI = () => request.get('/system/approval-orders/pending-count')
+export const createApprovalOrderAPI = (data) => request.post('/system/approval-orders', data)
+export const approveApprovalOrderAPI = (id, data) => request.put(`/system/approval-orders/${id}/approve`, data)
+export const rejectApprovalOrderAPI = (id, data) => request.put(`/system/approval-orders/${id}/reject`, data)

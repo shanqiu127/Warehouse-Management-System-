@@ -2,7 +2,6 @@ package org.example.back.controller;
 
 import jakarta.validation.Valid;
 import org.example.back.common.annotation.PreventDuplicateSubmit;
-import org.example.back.common.annotation.RequireAdmin;
 import org.example.back.common.result.PageResult;
 import org.example.back.common.result.Result;
 import org.example.back.dto.GoodsQueryDTO;
@@ -38,7 +37,6 @@ public class GoodsController {
     }
 
     @PostMapping
-    @RequireAdmin("仅管理员可新增商品")
     @PreventDuplicateSubmit(message = "请勿重复提交商品新增请求")
     public Result<Void> create(@Valid @RequestBody GoodsSaveDTO dto) {
         goodsService.create(dto);
@@ -46,7 +44,6 @@ public class GoodsController {
     }
 
     @PutMapping("/{id}")
-    @RequireAdmin("仅管理员可编辑商品")
     @PreventDuplicateSubmit(message = "请勿重复提交商品编辑请求")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody GoodsSaveDTO dto) {
         goodsService.update(id, dto);
@@ -54,7 +51,6 @@ public class GoodsController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireAdmin("仅管理员可删除商品")
     @PreventDuplicateSubmit(intervalMs = 1000, message = "删除请求过于频繁，请稍后再试")
     public Result<Void> delete(@PathVariable Long id) {
         goodsService.delete(id);

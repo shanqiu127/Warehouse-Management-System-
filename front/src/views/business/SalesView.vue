@@ -157,6 +157,8 @@ import {
   getSalesPageAPI,
   voidSalesAPI
 } from '@/api/business'
+import { createApprovalOrderAPI } from '@/api/system'
+import { getRole, normalizeRole } from '@/utils/auth'
 
 const searchForm = reactive({ keywords: '', dateRange: [] })
 const currentPage = ref(1)
@@ -231,6 +233,8 @@ const buildOperationTime = (selectedDate) => {
   if (!selectedDate) return undefined
   return String(selectedDate).replace(' ', 'T')
 }
+
+const isEmployeeRole = () => normalizeRole(getRole()) === 'employee'
 
 const chooseFrontendRecordBehavior = async () => {
   try {
@@ -365,13 +369,30 @@ const handleVoid = async (row, createRedFlush) => {
       inputValue: ''
     })
 
-    const res = await voidSalesAPI(row.id, {
-      reason: value || '',
-      createRedFlush
-    })
+    let res
+    if (isEmployeeRole()) {
+      res = await createApprovalOrderAPI({
+        bizType: 'sales',
+        bizId: row.id,
+        requestAction: createRedFlush ? 'void_red' : 'void',
+        reason: value || ''
+      })
+    } else {
+      res = await voidSalesAPI(row.id, {
+        reason: value || '',
+        createRedFlush
+      })
+    }
     if (res.code !== 200) {
       throw new Error(res.msg || '操作失败')
     }
+
+    if (isEmployeeRole()) {
+      ElMessage.success('审批申请已提交，等待管理员处理')
+      await loadList()
+      return
+    }
+
     ElMessage.success(createRedFlush ? '已完成作废红冲' : '作废成功')
     const behavior = await chooseFrontendRecordBehavior()
     if (behavior === 'remove') {

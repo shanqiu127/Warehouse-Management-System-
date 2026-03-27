@@ -40,7 +40,6 @@ public class SalesController {
     }
 
     @PostMapping
-    @RequireAdmin("仅管理员可新增销售单")
     @PreventDuplicateSubmit(intervalMs = 1800, message = "请勿重复提交销售单")
     public Result<Void> create(@Valid @RequestBody SalesSaveDTO dto) {
         salesService.create(dto);
@@ -49,7 +48,6 @@ public class SalesController {
 
     @DeleteMapping("/{id}")
     @AuditLog(module = "销售管理", action = "删除", targetType = "销售单")
-    @RequireAdmin("仅管理员可删除销售单")
     @PreventDuplicateSubmit(intervalMs = 1200, message = "删除请求过于频繁，请稍后再试")
     public Result<Void> delete(@PathVariable Long id) {
         salesService.delete(id);

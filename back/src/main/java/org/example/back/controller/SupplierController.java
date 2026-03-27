@@ -2,7 +2,6 @@ package org.example.back.controller;
 
 import jakarta.validation.Valid;
 import org.example.back.common.annotation.PreventDuplicateSubmit;
-import org.example.back.common.annotation.RequireAdmin;
 import org.example.back.common.result.PageResult;
 import org.example.back.common.result.Result;
 import org.example.back.dto.SupplierQueryDTO;
@@ -38,7 +37,6 @@ public class SupplierController {
     }
 
     @PostMapping
-    @RequireAdmin("仅管理员可新增供应商")
     @PreventDuplicateSubmit(message = "请勿重复提交供应商新增请求")
     public Result<Void> create(@Valid @RequestBody SupplierSaveDTO dto) {
         supplierService.create(dto);
@@ -46,7 +44,6 @@ public class SupplierController {
     }
 
     @PutMapping("/{id}")
-    @RequireAdmin("仅管理员可编辑供应商")
     @PreventDuplicateSubmit(message = "请勿重复提交供应商编辑请求")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody SupplierSaveDTO dto) {
         supplierService.update(id, dto);
@@ -54,7 +51,6 @@ public class SupplierController {
     }
 
     @DeleteMapping("/{id}")
-    @RequireAdmin("仅管理员可删除供应商")
     @PreventDuplicateSubmit(intervalMs = 1000, message = "删除请求过于频繁，请稍后再试")
     public Result<Void> delete(@PathVariable Long id) {
         supplierService.delete(id);

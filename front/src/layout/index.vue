@@ -24,7 +24,7 @@
           <el-menu-item index="/business/sales-return">销售退货单</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="/stock-warning" v-if="!onlySuperAdmin">
+        <el-sub-menu index="/stock-warning" v-if="isEmployeeOnly">
           <template #title>库存预警</template>
           <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
         </el-sub-menu>
@@ -38,6 +38,7 @@
         <!-- 系统管理中的业务模块仅管理员可见 -->
         <el-sub-menu index="/system" v-if="isAdminOnly">
           <template #title>系统管理</template>
+          <el-menu-item index="/system/void-approval">作废审批</el-menu-item>
           <el-menu-item index="/system/notice">公告管理</el-menu-item>
           <el-menu-item index="/system/user">用户管理</el-menu-item>
           <el-menu-item index="/system/dept">部门管理</el-menu-item>

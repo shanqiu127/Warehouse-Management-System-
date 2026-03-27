@@ -385,6 +385,41 @@ CREATE TABLE `biz_sales_return` (
     KEY `idx_is_deleted` (`is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客退表(客户退回商品)';
 
+-- 3.5 作废审批单表 (biz_approval_order)
+-- 记录普通员工发起的“作废/作废并红冲”审批请求，由管理员审批后执行
+DROP TABLE IF EXISTS `biz_approval_order`;
+CREATE TABLE `biz_approval_order` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `approval_no` VARCHAR(32) NOT NULL COMMENT '审批单号',
+    `biz_type` VARCHAR(30) NOT NULL COMMENT '业务类型: purchase/purchase_return/sales/sales_return',
+    `biz_id` BIGINT NOT NULL COMMENT '业务单据ID',
+    `biz_no` VARCHAR(30) DEFAULT NULL COMMENT '业务单号(冗余)',
+    `request_action` VARCHAR(20) NOT NULL COMMENT '申请动作: void/void_red',
+    `request_reason` VARCHAR(200) DEFAULT NULL COMMENT '申请原因',
+    `before_biz_status` TINYINT DEFAULT NULL COMMENT '审批前业务状态快照',
+    `before_biz_snapshot` LONGTEXT COMMENT '审批前业务详情快照(JSON)',
+    `after_biz_status` TINYINT DEFAULT NULL COMMENT '审批后业务状态快照',
+    `after_biz_snapshot` LONGTEXT COMMENT '审批后业务详情快照(JSON)',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-待审批, 2-已通过, 3-已驳回',
+    `requester_id` BIGINT NOT NULL COMMENT '申请人ID',
+    `requester_name` VARCHAR(50) NOT NULL COMMENT '申请人姓名',
+    `requester_role` VARCHAR(20) NOT NULL COMMENT '申请人角色',
+    `approver_id` BIGINT DEFAULT NULL COMMENT '审批人ID',
+    `approver_name` VARCHAR(50) DEFAULT NULL COMMENT '审批人姓名',
+    `approve_remark` VARCHAR(200) DEFAULT NULL COMMENT '审批备注',
+    `approved_at` DATETIME DEFAULT NULL COMMENT '审批通过时间',
+    `rejected_at` DATETIME DEFAULT NULL COMMENT '审批驳回时间',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_approval_no` (`approval_no`),
+    KEY `idx_biz` (`biz_type`, `biz_id`),
+    KEY `idx_status_create_time` (`status`, `create_time`),
+    KEY `idx_requester` (`requester_id`, `requester_role`),
+    KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='作废审批单表';
+
 -- =============================================
 -- 四、初始化测试数据
 -- =============================================

@@ -40,7 +40,6 @@ public class PurchaseController {
     }
 
     @PostMapping
-    @RequireAdmin("仅管理员可新增进货单")
     @PreventDuplicateSubmit(intervalMs = 1800, message = "请勿重复提交进货单")
     public Result<Void> create(@Valid @RequestBody PurchaseSaveDTO dto) {
         purchaseService.create(dto);
@@ -49,7 +48,6 @@ public class PurchaseController {
 
     @DeleteMapping("/{id}")
     @AuditLog(module = "进货管理", action = "删除", targetType = "进货单")
-    @RequireAdmin("仅管理员可删除进货单")
     @PreventDuplicateSubmit(intervalMs = 1200, message = "删除请求过于频繁，请稍后再试")
     public Result<Void> delete(@PathVariable Long id) {
         purchaseService.delete(id);
