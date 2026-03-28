@@ -5,11 +5,11 @@
         <span class="mode-label">统计视角</span>
         <el-radio-group v-model="viewMode" @change="fetchData">
           <el-radio-button label="sales">销售视角</el-radio-button>
-          <el-radio-button label="profit">毛利视角</el-radio-button>
+          <el-radio-button v-if="canViewProfit" label="profit">毛利视角</el-radio-button>
         </el-radio-group>
       </div>
       <el-collapse
-        v-if="viewMode === 'profit'"
+        v-if="canViewProfit && viewMode === 'profit'"
         v-model="profitExplainActiveNames"
         class="profit-explain-collapse"
       >
@@ -141,9 +141,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { loadECharts } from '@/utils/echartsLoader'
+import { useUserStore } from '@/stores/user'
 import {
   getChartOverviewAPI,
   getChartTop5API,
@@ -153,6 +154,9 @@ import {
   getChartProfitBrandTopAPI,
   getChartProfitDailyTrendAPI
 } from '@/api/business'
+
+const userStore = useUserStore()
+const canViewProfit = computed(() => userStore.role === 'admin')
 
 const viewMode = ref('sales')
 const profitExplainActiveNames = ref([])
@@ -186,6 +190,12 @@ let barChart = null
 let pieChart = null
 let lineChart = null
 let echarts = null
+
+watch(canViewProfit, (allowed) => {
+  if (!allowed && viewMode.value === 'profit') {
+    viewMode.value = 'sales'
+  }
+}, { immediate: true })
 
 const initCharts = async () => {
   if (!echarts) {
