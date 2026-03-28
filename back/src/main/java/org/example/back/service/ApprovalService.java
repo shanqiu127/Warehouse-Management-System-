@@ -24,6 +24,7 @@ import org.example.back.mapper.BizSalesReturnMapper;
 import org.example.back.vo.ApprovalOrderVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -115,7 +116,11 @@ public class ApprovalService {
         entity.setRequesterId(requester.getId());
         entity.setRequesterName(requester.getRealName());
         entity.setRequesterRole(role);
-        bizApprovalOrderMapper.insert(entity);
+        try {
+            bizApprovalOrderMapper.insert(entity);
+        } catch (DuplicateKeyException ex) {
+            throw BusinessException.validateFail("该单据已存在待审批申请，请勿重复提交");
+        }
     }
 
     public PageResult<ApprovalOrderVO> page(ApprovalQueryDTO queryDTO) {

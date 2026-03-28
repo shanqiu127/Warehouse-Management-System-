@@ -412,8 +412,16 @@ CREATE TABLE `biz_approval_order` (
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
+    `pending_unique_key` VARCHAR(100)
+        GENERATED ALWAYS AS (
+            CASE
+                WHEN `status` = 1 AND `is_deleted` = 0 THEN CONCAT(`biz_type`, '#', `biz_id`)
+                ELSE NULL
+            END
+        ) STORED COMMENT '待审批唯一键(仅status=1且未删除生效)',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_approval_no` (`approval_no`),
+    UNIQUE KEY `uk_pending_unique_key` (`pending_unique_key`),
     KEY `idx_biz` (`biz_type`, `biz_id`),
     KEY `idx_status_create_time` (`status`, `create_time`),
     KEY `idx_requester` (`requester_id`, `requester_role`),
