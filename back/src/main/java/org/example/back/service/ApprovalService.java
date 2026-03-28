@@ -51,6 +51,7 @@ public class ApprovalService {
 
     private static final String ROLE_EMPLOYEE = "employee";
     private static final String ROLE_ADMIN = "admin";
+    private static final int APPROVAL_TEXT_MAX_LEN = 200;
 
     private static final DateTimeFormatter APPROVAL_NO_TIME_FMT = DateTimeFormatter.ofPattern("yyMMddHHmmss");
 
@@ -107,7 +108,7 @@ public class ApprovalService {
         entity.setBizId(dto.getBizId());
         entity.setBizNo(meta.bizNo());
         entity.setRequestAction(action);
-        entity.setRequestReason(defaultReason(dto.getReason()));
+        entity.setRequestReason(normalizeAndValidateLength("申请原因", defaultReason(dto.getReason()), APPROVAL_TEXT_MAX_LEN));
         entity.setBeforeBizStatus(meta.bizStatus());
         entity.setBeforeBizSnapshot(meta.snapshot());
         entity.setAfterBizStatus(meta.bizStatus());
@@ -219,7 +220,8 @@ public class ApprovalService {
                 .eq(BizApprovalOrder::getStatus, STATUS_PROCESSING)
                 .eq(BizApprovalOrder::getIsDeleted, 0)
                 .set(BizApprovalOrder::getStatus, STATUS_APPROVED)
-                .set(BizApprovalOrder::getApproveRemark, trimText(dto == null ? null : dto.getRemark()))
+                .set(BizApprovalOrder::getApproveRemark,
+                    normalizeAndValidateLength("审批备注", dto == null ? null : dto.getRemark(), APPROVAL_TEXT_MAX_LEN))
                 .set(BizApprovalOrder::getBeforeBizStatus, beforeMeta.bizStatus())
                 .set(BizApprovalOrder::getBeforeBizSnapshot, beforeMeta.snapshot())
                 .set(BizApprovalOrder::getAfterBizStatus, afterMeta.bizStatus())
@@ -238,7 +240,8 @@ public class ApprovalService {
                 .eq(BizApprovalOrder::getStatus, STATUS_PROCESSING)
                 .eq(BizApprovalOrder::getIsDeleted, 0)
                 .set(BizApprovalOrder::getStatus, STATUS_REJECTED)
-                .set(BizApprovalOrder::getApproveRemark, trimText(dto == null ? null : dto.getRemark()))
+                .set(BizApprovalOrder::getApproveRemark,
+                    normalizeAndValidateLength("审批备注", dto == null ? null : dto.getRemark(), APPROVAL_TEXT_MAX_LEN))
                 .set(BizApprovalOrder::getBeforeBizStatus, currentMeta.bizStatus())
                 .set(BizApprovalOrder::getBeforeBizSnapshot, currentMeta.snapshot())
                 .set(BizApprovalOrder::getAfterBizStatus, currentMeta.bizStatus())
@@ -405,6 +408,14 @@ public class ApprovalService {
             return "";
         }
         return text.trim();
+    }
+
+    private String normalizeAndValidateLength(String fieldName, String text, int maxLen) {
+        String normalized = trimText(text);
+        if (normalized.length() > maxLen) {
+            throw BusinessException.validateFail(fieldName + "长度不能超过" + maxLen + "个字符");
+        }
+        return normalized;
     }
 
     private String defaultReason(String reason) {

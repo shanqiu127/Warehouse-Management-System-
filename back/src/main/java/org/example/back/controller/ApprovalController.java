@@ -50,7 +50,7 @@ public class ApprovalController {
     @RequireAdmin("仅管理员可审批")
     @AuditLog(module = "作废审批", action = "审批通过", targetType = "审批单")
     @PreventDuplicateSubmit(intervalMs = 1000, message = "请勿重复审批")
-    public Result<Void> approve(@PathVariable Long id, @RequestBody(required = false) ApprovalDecisionDTO dto) {
+    public Result<Void> approve(@PathVariable Long id, @Valid @RequestBody(required = false) ApprovalDecisionDTO dto) {
         approvalService.approve(id, dto);
         return Result.success();
     }
@@ -59,7 +59,7 @@ public class ApprovalController {
     @RequireAdmin("仅管理员可审批")
     @AuditLog(module = "作废审批", action = "审批驳回", targetType = "审批单")
     @PreventDuplicateSubmit(intervalMs = 1000, message = "请勿重复审批")
-    public Result<Void> reject(@PathVariable Long id, @RequestBody(required = false) ApprovalDecisionDTO dto) {
+    public Result<Void> reject(@PathVariable Long id, @Valid @RequestBody(required = false) ApprovalDecisionDTO dto) {
         approvalService.reject(id, dto);
         return Result.success();
     }
