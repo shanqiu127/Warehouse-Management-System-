@@ -84,7 +84,7 @@ const router = createRouter({
           path: "business/stock-warning",
           name: "BusinessStockWarning",
           component: () => import("../views/business/StockWarningView.vue"),
-          meta: { roles: ['employee'] }
+          meta: { roles: ['admin', 'employee'] }
         },
         // 以下为动态权限测试页面
         {

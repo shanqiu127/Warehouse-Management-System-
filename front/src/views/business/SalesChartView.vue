@@ -375,6 +375,13 @@ const buildParams = () => {
   }
 }
 
+const normalizeBizRes = (res, fallbackMsg) => {
+  if (!res || res.code !== 200) {
+    throw new Error(res?.msg || fallbackMsg)
+  }
+  return res.data
+}
+
 const fetchData = async () => {
   loading.value = true
   try {
@@ -387,14 +394,18 @@ const fetchData = async () => {
         getChartProfitDailyTrendAPI(params)
       ])
 
-      profitOverview.value = profitOverviewRes?.data || {
+      const profitOverviewData = normalizeBizRes(profitOverviewRes, '毛利概览加载失败')
+      const profitTopChartData = normalizeBizRes(profitTopRes, '品牌毛利TOP5加载失败')
+      const profitTrendChartData = normalizeBizRes(profitTrendRes, '毛利走势加载失败')
+
+      profitOverview.value = profitOverviewData || {
         netSalesAmount: 0,
         estimatedCost: 0,
         grossProfitAmount: 0,
         grossProfitRate: 0
       }
-      profitTopData.value = profitTopRes?.data || { nameList: [], dataList: [] }
-      profitTrendData.value = profitTrendRes?.data || { dateList: [], amountList: [] }
+      profitTopData.value = profitTopChartData || { nameList: [], dataList: [] }
+      profitTrendData.value = profitTrendChartData || { dateList: [], amountList: [] }
     } else {
       const [overviewRes, top5Res, brandRes, trendRes] = await Promise.all([
         getChartOverviewAPI(params),
@@ -403,22 +414,27 @@ const fetchData = async () => {
         getChartDailyTrendAPI(params)
       ])
 
-      overview.value = overviewRes?.data || {
+      const overviewData = normalizeBizRes(overviewRes, '销售概览加载失败')
+      const top5ChartData = normalizeBizRes(top5Res, '商品销量TOP5加载失败')
+      const brandRatioChartData = normalizeBizRes(brandRes, '品牌占比加载失败')
+      const trendChartData = normalizeBizRes(trendRes, '销售走势加载失败')
+
+      overview.value = overviewData || {
         salesAmount: 0,
         returnAmount: 0,
         netSalesAmount: 0,
         salesQuantity: 0,
         returnQuantity: 0
       }
-      top5Data.value = top5Res?.data || { nameList: [], dataList: [] }
-      brandRatioData.value = Array.isArray(brandRes?.data) ? brandRes.data : []
-      trendData.value = trendRes?.data || { dateList: [], amountList: [] }
+      top5Data.value = top5ChartData || { nameList: [], dataList: [] }
+      brandRatioData.value = Array.isArray(brandRatioChartData) ? brandRatioChartData : []
+      trendData.value = trendChartData || { dateList: [], amountList: [] }
     }
 
     updateCharts()
     ElMessage.success('图表数据刷新成功')
   } catch (error) {
-    ElMessage.error('图表数据加载失败，请检查登录状态或后端服务')
+    ElMessage.error(error?.message || '图表数据加载失败，请检查登录状态或后端服务')
   } finally {
     loading.value = false
   }
