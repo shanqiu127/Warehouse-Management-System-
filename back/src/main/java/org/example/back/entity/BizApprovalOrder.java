@@ -48,7 +48,7 @@ public class BizApprovalOrder {
     private String afterBizSnapshot;
 
     /**
-     * 1-待审批, 2-已通过, 3-已驳回
+     * 1-待审批, 2-已通过, 3-已驳回, 4-处理中
      */
     private Integer status;
 

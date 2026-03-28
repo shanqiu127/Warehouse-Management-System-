@@ -400,7 +400,7 @@ CREATE TABLE `biz_approval_order` (
     `before_biz_snapshot` LONGTEXT COMMENT '审批前业务详情快照(JSON)',
     `after_biz_status` TINYINT DEFAULT NULL COMMENT '审批后业务状态快照',
     `after_biz_snapshot` LONGTEXT COMMENT '审批后业务详情快照(JSON)',
-    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-待审批, 2-已通过, 3-已驳回',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-待审批, 2-已通过, 3-已驳回, 4-处理中',
     `requester_id` BIGINT NOT NULL COMMENT '申请人ID',
     `requester_name` VARCHAR(50) NOT NULL COMMENT '申请人姓名',
     `requester_role` VARCHAR(20) NOT NULL COMMENT '申请人角色',
@@ -425,12 +425,12 @@ CREATE TABLE `biz_approval_order` (
 -- =============================================
 
 -- 4.1 初始化管理员账号
--- 用户名: admin / superadmin / employee / lisi, 密码均为 123456
+-- 用户名: admin  / superadmin / employee / lisi, 密码均为 123456
 INSERT INTO `sys_user` (`id`, `username`, `password`, `real_name`, `role`, `status`, `phone`, `email`) VALUES
 (1, 'admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '系统管理员', 'admin', 1, '13800138000', 'admin@warehouse.com'),
 (2, 'employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '普通员工', 'employee', 1, '13900139000', 'employee@warehouse.com'),
-(4, 'lisi', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', 1, '13600136000', 'lisi@warehouse.com'),
-(5, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', 1, '13700137000', 'superadmin@warehouse.com');
+(3, 'lisi', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', 1, '13600136000', 'lisi@warehouse.com'),
+(4, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', 1, '13700137000', 'superadmin@warehouse.com');
 
 -- 4.1.1 初始化IP策略示例数据
 INSERT INTO `sys_ip_policy` (`policy_name`, `ip_cidr`, `allow_flag`, `status`, `priority`, `remark`) VALUES

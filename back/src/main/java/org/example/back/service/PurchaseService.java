@@ -178,14 +178,20 @@ public class PurchaseService {
         BizPurchase purchase = requirePurchase(id);
         ensureNormalStatus(purchase.getBizStatus(), "进货单");
 
-        decreaseStock(purchase.getGoodsId(), purchase.getQuantity(), "当前库存不足，无法作废该进货单");
-
         String reason = normalizeReason(dto == null ? null : dto.getReason());
         LocalDateTime now = LocalDateTime.now();
-        purchase.setBizStatus(2);
-        purchase.setVoidTime(now);
-        purchase.setVoidReason(reason);
-        bizPurchaseMapper.updateById(purchase);
+        LambdaUpdateWrapper<BizPurchase> voidWrapper = new LambdaUpdateWrapper<>();
+        voidWrapper.eq(BizPurchase::getId, purchase.getId())
+                .eq(BizPurchase::getBizStatus, 1)
+                .set(BizPurchase::getBizStatus, 2)
+                .set(BizPurchase::getVoidTime, now)
+                .set(BizPurchase::getVoidReason, reason);
+        int rows = bizPurchaseMapper.update(null, voidWrapper);
+        if (rows != 1) {
+            throw BusinessException.validateFail("进货单已被处理，禁止重复作废");
+        }
+
+        decreaseStock(purchase.getGoodsId(), purchase.getQuantity(), "当前库存不足，无法作废该进货单");
 
         if (dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush())) {
             LoginResponse.UserInfoVO loginUser = authService.getUserInfo();

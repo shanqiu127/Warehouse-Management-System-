@@ -2,6 +2,7 @@ package org.example.back.service;
 
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.example.back.common.exception.BusinessException;
 import org.example.back.common.result.PageResult;
@@ -42,6 +43,7 @@ public class ApprovalService {
     private static final int STATUS_PENDING = 1;
     private static final int STATUS_APPROVED = 2;
     private static final int STATUS_REJECTED = 3;
+    private static final int STATUS_PROCESSING = 4;
 
     private static final String ACTION_VOID = "void";
     private static final String ACTION_VOID_RED = "void_red";
@@ -144,7 +146,7 @@ public class ApprovalService {
     @Transactional(rollbackFor = Exception.class)
     public void approve(Long id, ApprovalDecisionDTO dto) {
         LoginResponse.UserInfoVO approver = requireAdminRole();
-        BizApprovalOrder entity = requirePendingOrder(id);
+        BizApprovalOrder entity = claimPendingOrder(id, approver);
         BizDocumentMeta beforeMeta = resolveBizMeta(entity.getBizType(), entity.getBizId());
 
         entity.setBeforeBizStatus(beforeMeta.bizStatus());
@@ -153,33 +155,19 @@ public class ApprovalService {
         executeVoidByApproval(entity);
         BizDocumentMeta afterMeta = resolveBizMeta(entity.getBizType(), entity.getBizId());
 
-        entity.setStatus(STATUS_APPROVED);
-        entity.setApproverId(approver.getId());
-        entity.setApproverName(approver.getRealName());
-        entity.setApproveRemark(trimText(dto == null ? null : dto.getRemark()));
-        entity.setAfterBizStatus(afterMeta.bizStatus());
-        entity.setAfterBizSnapshot(afterMeta.snapshot());
-        entity.setApprovedAt(LocalDateTime.now());
-        bizApprovalOrderMapper.updateById(entity);
+        finalizeApprove(entity.getId(), dto, beforeMeta, afterMeta);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void reject(Long id, ApprovalDecisionDTO dto) {
         LoginResponse.UserInfoVO approver = requireAdminRole();
-        BizApprovalOrder entity = requirePendingOrder(id);
+        BizApprovalOrder entity = claimPendingOrder(id, approver);
         BizDocumentMeta currentMeta = resolveBizMeta(entity.getBizType(), entity.getBizId());
 
         entity.setBeforeBizStatus(currentMeta.bizStatus());
         entity.setBeforeBizSnapshot(currentMeta.snapshot());
 
-        entity.setStatus(STATUS_REJECTED);
-        entity.setApproverId(approver.getId());
-        entity.setApproverName(approver.getRealName());
-        entity.setApproveRemark(trimText(dto == null ? null : dto.getRemark()));
-        entity.setAfterBizStatus(currentMeta.bizStatus());
-        entity.setAfterBizSnapshot(currentMeta.snapshot());
-        entity.setRejectedAt(LocalDateTime.now());
-        bizApprovalOrderMapper.updateById(entity);
+        finalizeReject(entity.getId(), dto, currentMeta);
     }
 
     private void executeVoidByApproval(BizApprovalOrder entity) {
@@ -196,7 +184,7 @@ public class ApprovalService {
         }
     }
 
-    private BizApprovalOrder requirePendingOrder(Long id) {
+    private BizApprovalOrder claimPendingOrder(Long id, LoginResponse.UserInfoVO approver) {
         BizApprovalOrder entity = bizApprovalOrderMapper.selectById(id);
         if (entity == null) {
             throw BusinessException.notFound("审批单不存在");
@@ -204,7 +192,58 @@ public class ApprovalService {
         if (!Integer.valueOf(STATUS_PENDING).equals(entity.getStatus())) {
             throw BusinessException.validateFail("审批单已处理，不能重复操作");
         }
+
+        LambdaUpdateWrapper<BizApprovalOrder> claimWrapper = new LambdaUpdateWrapper<>();
+        claimWrapper.eq(BizApprovalOrder::getId, id)
+                .eq(BizApprovalOrder::getStatus, STATUS_PENDING)
+                .eq(BizApprovalOrder::getIsDeleted, 0)
+                .set(BizApprovalOrder::getStatus, STATUS_PROCESSING)
+                .set(BizApprovalOrder::getApproverId, approver.getId())
+                .set(BizApprovalOrder::getApproverName, approver.getRealName());
+
+        int rows = bizApprovalOrderMapper.update(null, claimWrapper);
+        if (rows != 1) {
+            throw BusinessException.validateFail("审批单已被其他管理员处理，请刷新后重试");
+        }
         return entity;
+    }
+
+    private void finalizeApprove(Long id, ApprovalDecisionDTO dto, BizDocumentMeta beforeMeta, BizDocumentMeta afterMeta) {
+        LambdaUpdateWrapper<BizApprovalOrder> approveWrapper = new LambdaUpdateWrapper<>();
+        approveWrapper.eq(BizApprovalOrder::getId, id)
+                .eq(BizApprovalOrder::getStatus, STATUS_PROCESSING)
+                .eq(BizApprovalOrder::getIsDeleted, 0)
+                .set(BizApprovalOrder::getStatus, STATUS_APPROVED)
+                .set(BizApprovalOrder::getApproveRemark, trimText(dto == null ? null : dto.getRemark()))
+                .set(BizApprovalOrder::getBeforeBizStatus, beforeMeta.bizStatus())
+                .set(BizApprovalOrder::getBeforeBizSnapshot, beforeMeta.snapshot())
+                .set(BizApprovalOrder::getAfterBizStatus, afterMeta.bizStatus())
+                .set(BizApprovalOrder::getAfterBizSnapshot, afterMeta.snapshot())
+                .set(BizApprovalOrder::getApprovedAt, LocalDateTime.now())
+                .set(BizApprovalOrder::getRejectedAt, null);
+        int rows = bizApprovalOrderMapper.update(null, approveWrapper);
+        if (rows != 1) {
+            throw BusinessException.validateFail("审批单状态已变化，无法完成审批");
+        }
+    }
+
+    private void finalizeReject(Long id, ApprovalDecisionDTO dto, BizDocumentMeta currentMeta) {
+        LambdaUpdateWrapper<BizApprovalOrder> rejectWrapper = new LambdaUpdateWrapper<>();
+        rejectWrapper.eq(BizApprovalOrder::getId, id)
+                .eq(BizApprovalOrder::getStatus, STATUS_PROCESSING)
+                .eq(BizApprovalOrder::getIsDeleted, 0)
+                .set(BizApprovalOrder::getStatus, STATUS_REJECTED)
+                .set(BizApprovalOrder::getApproveRemark, trimText(dto == null ? null : dto.getRemark()))
+                .set(BizApprovalOrder::getBeforeBizStatus, currentMeta.bizStatus())
+                .set(BizApprovalOrder::getBeforeBizSnapshot, currentMeta.snapshot())
+                .set(BizApprovalOrder::getAfterBizStatus, currentMeta.bizStatus())
+                .set(BizApprovalOrder::getAfterBizSnapshot, currentMeta.snapshot())
+                .set(BizApprovalOrder::getRejectedAt, LocalDateTime.now())
+                .set(BizApprovalOrder::getApprovedAt, null);
+        int rows = bizApprovalOrderMapper.update(null, rejectWrapper);
+        if (rows != 1) {
+            throw BusinessException.validateFail("审批单状态已变化，无法完成驳回");
+        }
     }
 
     private void ensureNoPendingApproval(String bizType, Long bizId) {

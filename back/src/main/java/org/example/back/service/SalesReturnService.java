@@ -122,14 +122,20 @@ public class SalesReturnService {
         BizSalesReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "客退单");
 
-        decreaseStock(entity.getGoodsId(), entity.getQuantity(), "当前库存不足，无法作废该客退单");
-
         String reason = normalizeReason(dto == null ? null : dto.getReason());
         LocalDateTime now = LocalDateTime.now();
-        entity.setBizStatus(2);
-        entity.setVoidTime(now);
-        entity.setVoidReason(reason);
-        bizSalesReturnMapper.updateById(entity);
+        LambdaUpdateWrapper<BizSalesReturn> voidWrapper = new LambdaUpdateWrapper<>();
+        voidWrapper.eq(BizSalesReturn::getId, entity.getId())
+                .eq(BizSalesReturn::getBizStatus, 1)
+                .set(BizSalesReturn::getBizStatus, 2)
+                .set(BizSalesReturn::getVoidTime, now)
+                .set(BizSalesReturn::getVoidReason, reason);
+        int rows = bizSalesReturnMapper.update(null, voidWrapper);
+        if (rows != 1) {
+            throw BusinessException.validateFail("客退单已被处理，禁止重复作废");
+        }
+
+        decreaseStock(entity.getGoodsId(), entity.getQuantity(), "当前库存不足，无法作废该客退单");
 
         if (dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush())) {
             LoginResponse.UserInfoVO loginUser = authService.getUserInfo();

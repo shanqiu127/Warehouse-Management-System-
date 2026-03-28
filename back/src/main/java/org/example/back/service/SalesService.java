@@ -163,14 +163,20 @@ public class SalesService {
         BizSales entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "销售单");
 
-        increaseStock(entity.getGoodsId(), entity.getQuantity());
-
         String reason = normalizeReason(dto == null ? null : dto.getReason());
         LocalDateTime now = LocalDateTime.now();
-        entity.setBizStatus(2);
-        entity.setVoidTime(now);
-        entity.setVoidReason(reason);
-        bizSalesMapper.updateById(entity);
+        LambdaUpdateWrapper<BizSales> voidWrapper = new LambdaUpdateWrapper<>();
+        voidWrapper.eq(BizSales::getId, entity.getId())
+                .eq(BizSales::getBizStatus, 1)
+                .set(BizSales::getBizStatus, 2)
+                .set(BizSales::getVoidTime, now)
+                .set(BizSales::getVoidReason, reason);
+        int rows = bizSalesMapper.update(null, voidWrapper);
+        if (rows != 1) {
+            throw BusinessException.validateFail("销售单已被处理，禁止重复作废");
+        }
+
+        increaseStock(entity.getGoodsId(), entity.getQuantity());
 
         if (dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush())) {
             LoginResponse.UserInfoVO loginUser = authService.getUserInfo();

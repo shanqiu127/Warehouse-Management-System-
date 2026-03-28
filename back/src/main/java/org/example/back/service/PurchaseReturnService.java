@@ -136,14 +136,20 @@ public class PurchaseReturnService {
         BizPurchaseReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "进货退货单");
 
-        increaseStock(entity.getGoodsId(), entity.getQuantity());
-
         String reason = normalizeReason(dto == null ? null : dto.getReason());
         LocalDateTime now = LocalDateTime.now();
-        entity.setBizStatus(2);
-        entity.setVoidTime(now);
-        entity.setVoidReason(reason);
-        bizPurchaseReturnMapper.updateById(entity);
+        LambdaUpdateWrapper<BizPurchaseReturn> voidWrapper = new LambdaUpdateWrapper<>();
+        voidWrapper.eq(BizPurchaseReturn::getId, entity.getId())
+                .eq(BizPurchaseReturn::getBizStatus, 1)
+                .set(BizPurchaseReturn::getBizStatus, 2)
+                .set(BizPurchaseReturn::getVoidTime, now)
+                .set(BizPurchaseReturn::getVoidReason, reason);
+        int rows = bizPurchaseReturnMapper.update(null, voidWrapper);
+        if (rows != 1) {
+            throw BusinessException.validateFail("进货退货单已被处理，禁止重复作废");
+        }
+
+        increaseStock(entity.getGoodsId(), entity.getQuantity());
         // 如果前端请求中包含 createRedFlush 标志且为 true，则创建对应的红冲单
         if (dto != null && Boolean.TRUE.equals(dto.getCreateRedFlush())) {
             LoginResponse.UserInfoVO loginUser = authService.getUserInfo();
