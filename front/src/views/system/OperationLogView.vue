@@ -14,19 +14,13 @@
       </template>
 
       <el-form :inline="true" :model="searchForm" class="filter-row">
-        <el-form-item label="用户名">
+        <el-form-item label="用户名" class="control-sm">
           <el-input v-model="searchForm.username" clearable placeholder="输入用户名" />
         </el-form-item>
-        <el-form-item label="模块">
+        <el-form-item label="模块" class="control-sm">
           <el-input v-model="searchForm.module" clearable placeholder="输入模块" />
         </el-form-item>
-        <el-form-item label="动作">
-          <el-input v-model="searchForm.action" clearable placeholder="输入动作" />
-        </el-form-item>
-        <el-form-item label="目标类型">
-          <el-input v-model="searchForm.targetType" clearable placeholder="输入目标类型" />
-        </el-form-item>
-        <el-form-item label="时间区间">
+        <el-form-item label="时间区间" class="control-range">
           <el-date-picker
             v-model="searchForm.dateRange"
             type="daterange"
@@ -36,7 +30,7 @@
             value-format="YYYY-MM-DD"
           />
         </el-form-item>
-        <el-form-item>
+        <el-form-item class="control-actions">
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
@@ -105,8 +99,6 @@ const detail = reactive({})
 const searchForm = reactive({
   username: '',
   module: '',
-  action: '',
-  targetType: '',
   dateRange: []
 })
 
@@ -124,8 +116,6 @@ const loadList = async () => {
       pageSize: pageSize.value,
       username: searchForm.username || undefined,
       module: searchForm.module || undefined,
-      action: searchForm.action || undefined,
-      targetType: searchForm.targetType || undefined,
       startDate: hasRange ? searchForm.dateRange[0] : undefined,
       endDate: hasRange ? searchForm.dateRange[1] : undefined
     })
@@ -158,8 +148,6 @@ const handleSearch = () => {
 const handleReset = () => {
   searchForm.username = ''
   searchForm.module = ''
-  searchForm.action = ''
-  searchForm.targetType = ''
   searchForm.dateRange = []
   currentPage.value = 1
   loadList()
@@ -243,6 +231,20 @@ onMounted(() => {
 
 .filter-row {
   margin-bottom: 8px;
+}
+
+:deep(.filter-row .control-sm .el-input) {
+  width: 140px;
+}
+
+:deep(.filter-row .control-range .el-date-editor.el-input__wrapper),
+:deep(.filter-row .control-range .el-date-editor.el-range-editor) {
+  width: 250px;
+}
+
+:deep(.filter-row .control-actions .el-form-item__content) {
+  display: inline-flex;
+  gap: 8px;
 }
 
 .pager {

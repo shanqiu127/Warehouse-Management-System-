@@ -14,19 +14,19 @@
       </template>
 
       <el-form :inline="true" :model="searchForm" class="filter-row">
-        <el-form-item label="用户名">
+        <el-form-item label="用户名" class="control-sm">
           <el-input v-model="searchForm.username" clearable placeholder="输入用户名" />
         </el-form-item>
-        <el-form-item label="IP">
+        <el-form-item label="IP" class="control-sm">
           <el-input v-model="searchForm.ip" clearable placeholder="输入 IP" />
         </el-form-item>
-        <el-form-item label="结果">
-          <el-select v-model="searchForm.successFlag" clearable placeholder="全部" style="width: 120px">
+        <el-form-item label="结果" class="control-xs">
+          <el-select v-model="searchForm.successFlag" clearable placeholder="全部">
             <el-option :value="1" label="成功" />
             <el-option :value="0" label="失败" />
           </el-select>
         </el-form-item>
-        <el-form-item label="时间区间">
+        <el-form-item label="时间区间" class="control-range">
           <el-date-picker
             v-model="searchForm.dateRange"
             type="daterange"
@@ -36,7 +36,7 @@
             value-format="YYYY-MM-DD"
           />
         </el-form-item>
-        <el-form-item>
+        <el-form-item class="control-actions">
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
@@ -245,6 +245,24 @@ onMounted(() => {
 
 .filter-row {
   margin-bottom: 8px;
+}
+
+:deep(.filter-row .control-sm .el-input) {
+  width: 140px;
+}
+
+:deep(.filter-row .control-xs .el-select) {
+  width: 110px;
+}
+
+:deep(.filter-row .control-range .el-date-editor.el-input__wrapper),
+:deep(.filter-row .control-range .el-date-editor.el-range-editor) {
+  width: 250px;
+}
+
+:deep(.filter-row .control-actions .el-form-item__content) {
+  display: inline-flex;
+  gap: 8px;
 }
 
 .pager {

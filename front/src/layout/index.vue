@@ -35,19 +35,18 @@
           <el-menu-item index="/business/sales-chart">销售统计图表</el-menu-item>
         </el-sub-menu>
 
-        <!-- 系统管理中的业务模块仅管理员可见 -->
-        <el-sub-menu index="/system" v-if="isAdminOnly">
-          <template #title>系统管理</template>
-          <el-menu-item index="/system/void-approval">作废审批</el-menu-item>
-          <el-menu-item index="/system/notice">公告管理</el-menu-item>
-          <el-menu-item index="/system/user">用户管理</el-menu-item>
+        <el-menu-item index="/system/void-approval" v-if="isAdminOnly">作废审批</el-menu-item>
+        <el-menu-item index="/system/notice" v-if="isAdminOnly">公告管理</el-menu-item>
+        <el-sub-menu index="/personnel" v-if="isAdminOnly">
+          <template #title>人事管理</template>
           <el-menu-item index="/system/dept">部门管理</el-menu-item>
           <el-menu-item index="/system/employee">员工管理</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="/superadmin" v-if="onlySuperAdmin">
-          <template #title>超管中心</template>
-          <el-menu-item index="/system/super-admin">超管总览</el-menu-item>
+        <el-menu-item index="/system/super-admin" v-if="onlySuperAdmin">超管总览</el-menu-item>
+        <el-menu-item index="/system/user" v-if="onlySuperAdmin">用户管理</el-menu-item>
+        <el-sub-menu index="/superadmin-audit" v-if="onlySuperAdmin">
+          <template #title>安全审计</template>
           <el-menu-item index="/system/security-ip-policy">安全策略</el-menu-item>
           <el-menu-item index="/system/login-log">登录日志</el-menu-item>
           <el-menu-item index="/system/operation-log">操作日志</el-menu-item>
