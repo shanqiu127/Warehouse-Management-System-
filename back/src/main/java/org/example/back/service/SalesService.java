@@ -11,9 +11,11 @@ import org.example.back.dto.DocumentVoidDTO;
 import org.example.back.dto.SalesQueryDTO;
 import org.example.back.dto.SalesSaveDTO;
 import org.example.back.entity.BaseGoods;
+import org.example.back.entity.BizApprovalOrder;
 import org.example.back.entity.BizSales;
 import org.example.back.entity.BizSalesReturn;
 import org.example.back.mapper.BaseGoodsMapper;
+import org.example.back.mapper.BizApprovalOrderMapper;
 import org.example.back.mapper.BizPurchaseMapper;
 import org.example.back.mapper.BizSalesMapper;
 import org.example.back.mapper.BizSalesReturnMapper;
@@ -28,6 +30,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,9 +51,20 @@ public class SalesService {
     private BizPurchaseMapper bizPurchaseMapper;
 
     @Autowired
+    private BizApprovalOrderMapper bizApprovalOrderMapper;
+
+    @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AuthzService authzService;
+
+    private void requireSalesModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_SALES, "仅销售部门管理员可访问销售模块");
+    }
+
     public PageResult<SalesVO> page(SalesQueryDTO queryDTO) {
+        requireSalesModuleAccess();
         LocalDateTime startTime = queryDTO.getStartDate() == null ? null : queryDTO.getStartDate().atStartOfDay();
         LocalDateTime endTime = queryDTO.getEndDate() == null ? null : queryDTO.getEndDate().plusDays(1).atStartOfDay();
 
@@ -63,16 +77,19 @@ public class SalesService {
                 .orderByDesc(BizSales::getId);
 
         Page<BizSales> page = bizSalesMapper.selectPage(new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize()), wrapper);
-        List<SalesVO> records = page.getRecords().stream().map(this::toVO).toList();
+        Map<Long, BizApprovalOrder> approvalMap = buildLatestApprovalMap(page.getRecords().stream().map(BizSales::getId).toList());
+        List<SalesVO> records = page.getRecords().stream().map(item -> toVO(item, approvalMap.get(item.getId()))).toList();
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
     public SalesVO getById(Long id) {
+        requireSalesModuleAccess();
         BizSales entity = requireEntity(id);
-        return toVO(entity);
+        return toVO(entity, resolveLatestApproval(entity.getId()));
     }
 
     public List<SalesSourceOptionVO> returnableOptions(Long goodsId) {
+        requireSalesModuleAccess();
         LambdaQueryWrapper<BizSales> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BizSales::getBizStatus, 1)
                 .eq(goodsId != null, BizSales::getGoodsId, goodsId)
@@ -119,6 +136,7 @@ public class SalesService {
 
     @Transactional(rollbackFor = Exception.class)
     public void create(SalesSaveDTO dto) {
+        requireSalesModuleAccess();
         validateQuantity(dto.getQuantity());
 
         BaseGoods goods = requireGoods(dto.getGoodsId());
@@ -151,6 +169,7 @@ public class SalesService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        requireSalesModuleAccess();
         BizSales entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "销售单");
         validateDeleteWindow(entity.getOperationTime(), "销售单");
@@ -160,6 +179,7 @@ public class SalesService {
 
     @Transactional(rollbackFor = Exception.class)
     public void voidDocument(Long id, DocumentVoidDTO dto) {
+        requireSalesVoidExecutionAccess();
         BizSales entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "销售单");
 
@@ -199,6 +219,16 @@ public class SalesService {
             redFlushDoc.setVoidReason(reason);
             bizSalesMapper.insert(redFlushDoc);
         }
+    }
+
+    private void requireSalesVoidExecutionAccess() {
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_WAREHOUSE)) {
+            return;
+        }
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_SALES)) {
+            throw BusinessException.validateFail("历史销售单作废/红冲需提交仓储审批");
+        }
+        throw BusinessException.forbidden("仅销售部门管理员可发起销售作废申请，且需由仓储部门审批");
     }
 
     private BizSales requireEntity(Long id) {
@@ -298,7 +328,26 @@ public class SalesService {
         }
     }
 
-    private SalesVO toVO(BizSales entity) {
+    private Map<Long, BizApprovalOrder> buildLatestApprovalMap(List<Long> bizIds) {
+        if (bizIds.isEmpty()) {
+            return Map.of();
+        }
+        LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizApprovalOrder::getBizType, "sales")
+                .in(BizApprovalOrder::getBizId, bizIds)
+                .orderByDesc(BizApprovalOrder::getId);
+        Map<Long, BizApprovalOrder> approvalMap = new LinkedHashMap<>();
+        for (BizApprovalOrder item : bizApprovalOrderMapper.selectList(wrapper)) {
+            approvalMap.putIfAbsent(item.getBizId(), item);
+        }
+        return approvalMap;
+    }
+
+    private BizApprovalOrder resolveLatestApproval(Long bizId) {
+        return buildLatestApprovalMap(List.of(bizId)).get(bizId);
+    }
+
+    private SalesVO toVO(BizSales entity, BizApprovalOrder approvalOrder) {
         SalesVO vo = new SalesVO();
         BeanUtils.copyProperties(entity, vo);
         LocalDateTime bizTime = entity.getOperationTime() == null ? entity.getCreateTime() : entity.getOperationTime();
@@ -311,6 +360,8 @@ public class SalesService {
         vo.setSourceId(entity.getSourceId());
         vo.setVoidTime(entity.getVoidTime());
         vo.setVoidReason(entity.getVoidReason());
+        vo.setApprovalStatus(approvalOrder == null ? null : approvalOrder.getStatus());
+        vo.setApprovalRequestAction(approvalOrder == null ? null : approvalOrder.getRequestAction());
         return vo;
     }
 

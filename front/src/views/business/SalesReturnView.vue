@@ -4,7 +4,7 @@
       <div class="search-box">
         <div class="top-right-help">
           <span class="help-label">作废/红冲:</span>
-          <el-tooltip content="仅作废：撤销业务并回滚库存；作废并红冲：额外生成红冲单用于审计追溯。" placement="left">
+          <el-tooltip content="当天单据可直接删除；历史单据的作废/红冲会提交给仓储管理员审批，通过后才执行。" placement="left">
             <el-icon class="void-help-icon"><QuestionFilled /></el-icon>
           </el-tooltip>
         </div>
@@ -25,7 +25,7 @@
           <el-form-item>
             <el-button type="primary" @click="handleSearch">查询</el-button>
             <el-button @click="resetSearch">重置</el-button>
-            <el-button v-permission="['admin', 'employee']" type="warning" @click="handleAdd">新建销售退货单</el-button>
+            <el-button v-permission="{ roles: ['admin'], deptCodes: ['sales'] }" type="warning" @click="handleAdd">新建销售退货单</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -40,23 +40,13 @@
         <el-table-column prop="refundAmount" label="退货金额(元)" width="120" />
         <el-table-column prop="returnDate" label="退货日期" width="180" />
         <el-table-column prop="operator" label="操作人" width="100" />
-        <el-table-column label="操作" width="130" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="scope">
             <div class="action-group">
               <el-button size="small" type="primary" link @click="handleView(scope.row)">查看</el-button>
               <el-button
-                v-if="scope.row?.__uiDeleted"
-                v-permission="['admin', 'employee']"
-                size="small"
-                type="danger"
-                link
-                disabled
-              >
-                删除
-              </el-button>
-              <el-button
-                v-else-if="canDelete(scope.row)"
-                v-permission="['admin', 'employee']"
+                v-if="showDeleteAction(scope.row)"
+                v-permission="{ roles: ['admin'], deptCodes: ['sales'] }"
                 size="small"
                 type="danger"
                 link
@@ -64,9 +54,9 @@
               >
                 删除
               </el-button>
-              <template v-else>
+              <template v-else-if="showVoidActions(scope.row)">
               <el-button
-                v-permission="['admin', 'employee']"
+                v-permission="{ roles: ['admin'], deptCodes: ['sales'] }"
                 size="small"
                 type="warning"
                 link
@@ -76,7 +66,7 @@
                 仅作废
               </el-button>
               <el-button
-                v-permission="['admin', 'employee']"
+                v-permission="{ roles: ['admin'], deptCodes: ['sales'] }"
                 size="small"
                 type="danger"
                 link
@@ -86,6 +76,7 @@
                 作废并红冲
               </el-button>
               </template>
+              <span v-else :class="['action-disabled', stateTextClass(scope.row)]">{{ resolveState(scope.row)?.label || '不可操作' }}</span>
             </div>
           </template>
         </el-table-column>
@@ -166,16 +157,15 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
+import { createApprovalOrderAPI } from '@/api/system'
+import { hasBizDocumentWorkflowState, isBizDocumentDeleted, resolveBizDocumentState } from '@/utils/bizDocumentState'
 import {
   createSalesReturnAPI,
   deleteSalesReturnAPI,
   getReturnableSalesOptionsAPI,
   getSalesReturnDetailAPI,
-  getSalesReturnPageAPI,
-  voidSalesReturnAPI
+  getSalesReturnPageAPI
 } from '@/api/business'
-import { createApprovalOrderAPI } from '@/api/system'
-import { getRole, normalizeRole } from '@/utils/auth'
 
 const searchForm = reactive({ keywords: '', dateRange: [] })
 const currentPage = ref(1)
@@ -228,45 +218,35 @@ const resolveBizDate = (row) => {
 }
 
 const canDelete = (row) => {
-  if (row?.__uiDeleted) return false
+  if (isBizDocumentDeleted(row)) return false
   if (row?.bizStatus !== 1) return false
   return toDateOnly(resolveBizDate(row)) === localToday()
 }
 
 const canVoid = (row) => {
-  if (row?.__uiDeleted) return false
+  if (isBizDocumentDeleted(row)) return false
   if (row?.bizStatus !== 1) return false
   return toDateOnly(resolveBizDate(row)) !== localToday()
 }
 
-const actionDisabledText = (row) => {
-  if (row?.__uiDeleted) return '已删除'
-  if (row?.bizStatus === 2) return '已作废'
-  if (row?.bizStatus === 3) return '已红冲'
-  if (row?.bizStatus === 1) return '已删除'
-  return '不可操作'
+const resolveState = (row) => resolveBizDocumentState(row)
+
+const stateTextClass = (row) => {
+  const state = resolveState(row)
+  if (!state) return ''
+  if (state.type === 'success') return 'state-success'
+  if (state.type === 'danger') return 'state-danger'
+  if (state.type === 'warning') return 'state-warning'
+  return ''
 }
+
+const showDeleteAction = (row) => !hasBizDocumentWorkflowState(row) && canDelete(row)
+
+const showVoidActions = (row) => !hasBizDocumentWorkflowState(row) && canVoid(row)
 
 const buildOperationTime = (selectedDate) => {
   if (!selectedDate) return undefined
   return String(selectedDate).replace(' ', 'T')
-}
-
-const isEmployeeRole = () => normalizeRole(getRole()) === 'employee'
-
-const chooseFrontendRecordBehavior = async () => {
-  try {
-    await ElMessageBox.confirm('操作已完成，是否保留当前列表中的前端记录？', '前端记录处理', {
-      type: 'info',
-      confirmButtonText: '保留',
-      cancelButtonText: '移除',
-      distinguishCancelAndClose: true
-    })
-    return 'keep'
-  } catch (action) {
-    if (action === 'cancel') return 'remove'
-    return 'keep'
-  }
 }
 
 const loadSourceSalesOptions = async () => {
@@ -377,12 +357,8 @@ const handleDelete = (row) => {
       throw new Error(res.msg || '删除失败')
     }
     ElMessage.success('删除成功')
-    const behavior = await chooseFrontendRecordBehavior()
-    if (behavior === 'remove') {
-      tableData.value = tableData.value.filter((item) => item.id !== row.id)
-      return
-    }
     row.__uiDeleted = true
+    row.isDeleted = 1
   }).catch((error) => {
     if (error?.message) {
       ElMessage.error(error.message)
@@ -401,37 +377,18 @@ const handleVoid = async (row, createRedFlush) => {
       inputValue: ''
     })
 
-    let res
-    if (isEmployeeRole()) {
-      res = await createApprovalOrderAPI({
-        bizType: 'sales_return',
-        bizId: row.id,
-        requestAction: createRedFlush ? 'void_red' : 'void',
-        reason: value || ''
-      })
-    } else {
-      res = await voidSalesReturnAPI(row.id, {
-        reason: value || '',
-        createRedFlush
-      })
-    }
+    const res = await createApprovalOrderAPI({
+      bizType: 'sales_return',
+      bizId: row.id,
+      requestAction: createRedFlush ? 'void_red' : 'void',
+      reason: value || ''
+    })
     if (res.code !== 200) {
       throw new Error(res.msg || '操作失败')
     }
 
-    if (isEmployeeRole()) {
-      ElMessage.success('审批申请已提交，等待管理员处理')
-      await loadList()
-      return
-    }
-
-    ElMessage.success(createRedFlush ? '已完成作废红冲' : '作废成功')
-    const behavior = await chooseFrontendRecordBehavior()
-    if (behavior === 'remove') {
-      tableData.value = tableData.value.filter((item) => item.id !== row.id)
-      return
-    }
-    row.bizStatus = createRedFlush ? 3 : 2
+    ElMessage.success('作废并红冲审批已提交，等待仓储管理员处理')
+    await loadList()
   } catch (error) {
     if (error?.message && error.message !== 'cancel') {
       ElMessage.error(error.message)
@@ -504,6 +461,18 @@ onMounted(async () => {
 .action-disabled {
   color: #999;
   font-size: 12px;
+}
+
+.state-success {
+  color: #16a34a;
+}
+
+.state-danger {
+  color: #dc2626;
+}
+
+.state-warning {
+  color: #d97706;
 }
 
 .action-group {

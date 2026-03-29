@@ -1,5 +1,6 @@
 package org.example.back.service;
 
+import org.example.back.common.exception.BusinessException;
 import org.example.back.dto.SalesChartQueryDTO;
 import org.example.back.mapper.BizSalesMapper;
 import org.example.back.mapper.BizSalesReturnMapper;
@@ -34,7 +35,11 @@ public class SalesChartService {
     @Autowired
     private BizSalesReturnMapper bizSalesReturnMapper;
 
+    @Autowired
+    private AuthzService authzService;
+
     public ChartOverviewVO getOverview(SalesChartQueryDTO queryDTO) {
+        requireFinanceOverviewAccess();
         DateRange range = resolveRange(queryDTO);
 
         BigDecimal salesAmount = defaultAmount(bizSalesMapper.sumSalesAmount(range.startTime(), range.endTime()));
@@ -52,6 +57,7 @@ public class SalesChartService {
     }
 
     public SalesTop5VO getTop5(SalesChartQueryDTO queryDTO) {
+        requireFinanceOverviewAccess();
         DateRange range = resolveRange(queryDTO);
         List<BizSalesMapper.TopGoodsAgg> rows = bizSalesMapper.topGoods(range.startTime(), range.endTime());
 
@@ -69,6 +75,7 @@ public class SalesChartService {
     }
 
     public List<BrandRatioItemVO> getBrandRatio(SalesChartQueryDTO queryDTO) {
+        requireFinanceOverviewAccess();
         DateRange range = resolveRange(queryDTO);
         List<BizSalesMapper.BrandAmountAgg> rows = bizSalesMapper.brandSalesAmount(range.startTime(), range.endTime());
 
@@ -83,6 +90,7 @@ public class SalesChartService {
     }
 
     public SalesTrendVO getDailyTrend(SalesChartQueryDTO queryDTO) {
+        requireFinanceOverviewAccess();
         DateRange range = resolveRange(queryDTO);
         List<BizSalesMapper.DailyAmountAgg> rows = bizSalesMapper.dailySalesAmount(range.startTime(), range.endTime());
 
@@ -108,6 +116,7 @@ public class SalesChartService {
     }
 
     public ProfitOverviewVO getProfitOverview(SalesChartQueryDTO queryDTO) {
+        requireFinanceProfitAccess();
         DateRange range = resolveValidRange(queryDTO);
 
         BigDecimal salesAmount = defaultAmount(bizSalesMapper.sumValidSalesAmount(range.startTime(), range.endTime()));
@@ -136,6 +145,7 @@ public class SalesChartService {
     }
 
     public ProfitBrandTopVO getProfitBrandTop(SalesChartQueryDTO queryDTO) {
+        requireFinanceProfitAccess();
         DateRange range = resolveValidRange(queryDTO);
 
         Map<String, BigDecimal> brandProfitMap = new HashMap<>();
@@ -165,6 +175,7 @@ public class SalesChartService {
     }
 
     public ProfitTrendVO getProfitDailyTrend(SalesChartQueryDTO queryDTO) {
+        requireFinanceProfitAccess();
         DateRange range = resolveValidRange(queryDTO);
 
         Map<String, BigDecimal> salesAmountMap = toAmountMap(bizSalesMapper.dailyValidSalesAmount(range.startTime(), range.endTime()));
@@ -280,6 +291,17 @@ public class SalesChartService {
 
     private Long defaultCount(Long value) {
         return value == null ? 0L : value;
+    }
+
+    private void requireFinanceOverviewAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_FINANCE, "仅财务部门管理员可访问统计报表");
+    }
+
+    private void requireFinanceProfitAccess() {
+        if (authzService.isSuperAdmin()) {
+            throw BusinessException.forbidden("利润分析仅财务部门管理员可访问");
+        }
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_FINANCE, "仅财务部门管理员可访问利润分析");
     }
 
     private record DateRange(LocalDate startDate, LocalDate endDate, LocalDateTime startTime, LocalDateTime endTime) {

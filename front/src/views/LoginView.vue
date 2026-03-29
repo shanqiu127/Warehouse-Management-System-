@@ -122,8 +122,8 @@ const handleLogin = () => {
         }
 
         userStore.setToken(res.data.token)
+        userStore.setUserInfo(res.data.userInfo || {})
         const currentRole = normalizeRole(res.data.userInfo?.role)
-        userStore.setRole(currentRole)
 
         const roleText = currentRole === 'superadmin'
           ? '超级管理员'

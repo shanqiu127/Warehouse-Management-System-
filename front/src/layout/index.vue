@@ -4,48 +4,52 @@
       <h3 style="text-align: center; color: white; padding: 15px 0; margin: 0;">仓库管理系统</h3>
       <el-menu background-color="#304156" text-color="#fff" router :default-active="$route.path">
         <el-menu-item index="/home">首页</el-menu-item>
-        
-        <!-- 角色分工调整：基础资料/进货/销售仅对普通员工显示 -->
-        <el-sub-menu index="/base" v-if="isEmployeeOnly">
-          <template #title>基础资料</template>
+
+        <template v-if="isHrAdmin">
+          <el-menu-item index="/system/dept">全部门管理</el-menu-item>
+          <el-menu-item index="/system/employee">全员工管理</el-menu-item>
+          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-menu-item index="/system/user">用户部门管理</el-menu-item>
+        </template>
+
+        <template v-else-if="isPurchaseAdmin">
+          <el-menu-item index="/business/purchase">商品进货</el-menu-item>
+          <el-menu-item index="/business/purchase-return">进货退货</el-menu-item>
+          <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
+          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-menu-item index="/system/user">用户部门管理</el-menu-item>
+        </template>
+
+        <template v-else-if="isSalesAdmin">
+          <el-menu-item index="/business/sales">商品销售</el-menu-item>
+          <el-menu-item index="/business/sales-return">销售退货</el-menu-item>
+          <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
+          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-menu-item index="/system/user">用户部门管理</el-menu-item>
+        </template>
+
+        <template v-else-if="isWarehouseAdmin">
           <el-menu-item index="/base/supplier">供应商管理</el-menu-item>
           <el-menu-item index="/base/goods">商品资料管理</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu index="/purchase" v-if="isEmployeeOnly">
-          <template #title>进货</template>
-          <el-menu-item index="/business/purchase">商品进货</el-menu-item>
-          <el-menu-item index="/business/purchase-return">进货退货单</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu index="/sales" v-if="isEmployeeOnly">
-          <template #title>销售</template>
-          <el-menu-item index="/business/sales">商品销售</el-menu-item>
-          <el-menu-item index="/business/sales-return">销售退货单</el-menu-item>
-        </el-sub-menu>
-
-        <el-sub-menu index="/stock-warning" v-if="isEmployeeOnly">
-          <template #title>库存预警</template>
           <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
-        </el-sub-menu>
+          <el-menu-item index="/system/void-approval">作废审批</el-menu-item>
+          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-menu-item index="/system/user">用户部门管理</el-menu-item>
+        </template>
 
-        <!-- 统计报表仅管理员可见 -->
-        <el-sub-menu index="/statistics" v-if="isAdminOnly">
-          <template #title>统计报表</template>
+        <template v-else-if="isFinanceAdmin">
           <el-menu-item index="/business/sales-chart">销售统计图表</el-menu-item>
-        </el-sub-menu>
+          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-menu-item index="/system/user">用户部门管理</el-menu-item>
+        </template>
 
-        <el-menu-item index="/system/void-approval" v-if="isAdminOnly">作废审批</el-menu-item>
-        <el-menu-item index="/system/notice" v-if="isAdminOnly">公告管理</el-menu-item>
-        <el-sub-menu index="/personnel" v-if="isAdminOnly">
-          <template #title>人事管理</template>
-          <el-menu-item index="/system/dept">部门管理</el-menu-item>
-          <el-menu-item index="/system/employee">员工管理</el-menu-item>
-        </el-sub-menu>
+        <template v-else-if="showSuperAdminCenter">
+          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-menu-item index="/system/user">用户管理</el-menu-item>
+          <el-menu-item index="/system/super-admin">超管总览</el-menu-item>
+        </template>
 
-        <el-menu-item index="/system/super-admin" v-if="onlySuperAdmin">超管总览</el-menu-item>
-        <el-menu-item index="/system/user" v-if="onlySuperAdmin">用户管理</el-menu-item>
-        <el-sub-menu index="/superadmin-audit" v-if="onlySuperAdmin">
+        <el-sub-menu index="/superadmin-audit" v-if="showSuperAdminCenter">
           <template #title>安全审计</template>
           <el-menu-item index="/system/security-ip-policy">安全策略</el-menu-item>
           <el-menu-item index="/system/login-log">登录日志</el-menu-item>
@@ -72,16 +76,27 @@ import { useRouter } from 'vue-router'
 import { computed } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { isSuperAdmin, normalizeRole } from '@/utils/auth'
+import { isAdminRole, isSuperAdmin, normalizeDeptCode } from '@/utils/auth'
+import { logoutAPI } from '@/api/user'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-const isAdminOnly = computed(() => normalizeRole(userStore.role) === 'admin')
-const isEmployeeOnly = computed(() => normalizeRole(userStore.role) === 'employee')
-const onlySuperAdmin = computed(() => isSuperAdmin(userStore.role))
+const currentDeptCode = computed(() => normalizeDeptCode(userStore.deptCode))
+const isDeptAdminRole = computed(() => isAdminRole(userStore.role))
+const showSuperAdminCenter = computed(() => isSuperAdmin(userStore.role))
+const isFinanceAdmin = computed(() => isDeptAdminRole.value && currentDeptCode.value === 'finance')
+const isSalesAdmin = computed(() => isDeptAdminRole.value && currentDeptCode.value === 'sales')
+const isWarehouseAdmin = computed(() => isDeptAdminRole.value && currentDeptCode.value === 'warehouse')
+const isPurchaseAdmin = computed(() => isDeptAdminRole.value && currentDeptCode.value === 'purchase')
+const isHrAdmin = computed(() => isDeptAdminRole.value && currentDeptCode.value === 'hr')
 
-const handleLogout = () => {
+const handleLogout = async () => {
+  try {
+    await logoutAPI()
+  } catch {
+    // 本地登录态仍需清理，避免后端会话异常时阻塞退出。
+  }
   userStore.clearToken()
   ElMessage.success('已安全退出')
   router.push('/login')

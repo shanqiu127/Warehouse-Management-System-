@@ -4,14 +4,17 @@
       <el-form-item label="用户名">
         <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable />
       </el-form-item>
-      <el-form-item label="角色">
-        <el-select v-model="searchForm.role" clearable placeholder="全部" style="width: 120px;">
-          <el-option label="超级管理员" value="superadmin" />
-          <el-option label="管理员" value="admin" />
-          <el-option label="普通用户" value="employee" />
+      <el-form-item v-if="isSuperAdminUser" label="角色">
+        <el-select v-model="searchForm.role" clearable placeholder="全部" style="width: 140px;" :disabled="!isSuperAdminUser">
+          <el-option v-for="item in roleFilterOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
       </el-form-item>
-      <el-form-item label="状态">
+      <el-form-item v-if="isSuperAdminUser" label="所属部门">
+        <el-select v-model="searchForm.deptId" clearable placeholder="全部" style="width: 160px;" :disabled="!isSuperAdminUser">
+          <el-option v-for="dept in deptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
+        </el-select>
+      </el-form-item>
+      <el-form-item v-if="!isSuperAdminUser" label="状态">
         <el-select v-model="searchForm.status" clearable placeholder="全部" style="width: 120px;">
           <el-option label="正常" :value="1" />
           <el-option label="禁用" :value="0" />
@@ -26,33 +29,34 @@
 
     <el-table :data="tableData" border style="width: 100%" v-loading="loading">
       <el-table-column type="index" label="序号" width="60" />
-      <el-table-column prop="username" label="用户名" />
-      <el-table-column prop="realName" label="真实姓名" />
-      <el-table-column prop="role" label="角色">
+      <el-table-column prop="username" label="用户名" min-width="120" />
+      <el-table-column prop="realName" label="真实姓名" min-width="120" />
+      <el-table-column v-if="isSuperAdminUser" prop="deptName" label="所属部门" min-width="120" />
+      <el-table-column v-if="isSuperAdminUser" prop="role" label="角色" width="120">
         <template #default="scope">
           <el-tag :type="scope.row.role === 'superadmin' ? 'danger' : (scope.row.role === 'admin' ? 'warning' : 'info')">
-            {{ scope.row.role === 'superadmin' ? '超级管理员' : (scope.row.role === 'admin' ? '管理员' : '普通用户') }}
+            {{ roleLabel(scope.row.role) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="status" label="状态">
+      <el-table-column prop="status" label="状态" width="120">
         <template #default="scope">
           <el-switch
             :model-value="scope.row.status"
             active-text="正常"
             inactive-text="禁用"
-            :disabled="scope.row.role === 'superadmin'"
+            :disabled="!canManageRow(scope.row)"
             @change="(val) => handleStatusChange(scope.row, val)"
           />
         </template>
       </el-table-column>
       <el-table-column prop="phone" label="手机号" width="150" />
       <el-table-column prop="email" label="邮箱" min-width="180" />
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="250" fixed="right">
         <template #default="scope">
-          <el-button size="small" type="primary" :disabled="scope.row.role === 'superadmin'" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" @click="handleResetPassword(scope.row)" :disabled="!canResetPassword(scope.row)">设置密码</el-button>
-          <el-button size="small" type="danger" :disabled="scope.row.role === 'superadmin'" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button size="small" type="primary" :disabled="!canManageRow(scope.row)" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-button size="small" :disabled="!canResetPassword(scope.row)" @click="handleResetPassword(scope.row)">设置密码</el-button>
+          <el-button size="small" type="danger" :disabled="!canManageRow(scope.row)" @click="handleDelete(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -69,18 +73,22 @@
       />
     </div>
 
-    <el-dialog :title="dialogTitle" v-model="dialogVisible" width="400px">
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="80px">
+    <el-dialog :title="dialogTitle" v-model="dialogVisible" width="460px">
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="88px">
         <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username"></el-input>
+          <el-input v-model="form.username" />
         </el-form-item>
         <el-form-item label="真实姓名" prop="realName">
-          <el-input v-model="form.realName"></el-input>
+          <el-input v-model="form.realName" />
         </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;">
-            <el-option label="管理员" value="admin" />
-            <el-option label="普通用户" value="employee" />
+        <el-form-item v-if="isSuperAdminUser" label="角色" prop="role">
+          <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;" :disabled="!isSuperAdminUser">
+            <el-option v-for="item in formRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="isSuperAdminUser" label="所属部门" prop="deptId">
+          <el-select v-model="form.deptId" placeholder="请选择所属部门" style="width: 100%;" :disabled="!isSuperAdminUser">
+            <el-option v-for="dept in deptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="status">
@@ -90,10 +98,10 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="手机号">
-          <el-input v-model="form.phone"></el-input>
+          <el-input v-model="form.phone" />
         </el-form-item>
         <el-form-item label="邮箱">
-          <el-input v-model="form.email"></el-input>
+          <el-input v-model="form.email" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -105,12 +113,14 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { isSuperAdmin } from '@/utils/auth'
 import {
   createUserAPI,
   deleteUserAPI,
+  getDeptOptionsAPI,
   getUserDetailAPI,
   getUserPageAPI,
   resetUserPasswordAPI,
@@ -120,7 +130,28 @@ import {
 
 const userStore = useUserStore()
 
-const searchForm = reactive({ username: '', role: '', status: null })
+const isSuperAdminUser = computed(() => isSuperAdmin(userStore.role))
+const deptOptions = ref([])
+
+const roleFilterOptions = computed(() => (
+  isSuperAdminUser.value
+    ? [
+        { label: '管理员', value: 'admin' },
+        { label: '普通员工', value: 'employee' }
+      ]
+    : [{ label: '普通员工', value: 'employee' }]
+))
+
+const formRoleOptions = computed(() => (
+  isSuperAdminUser.value
+    ? [
+        { label: '管理员', value: 'admin' },
+        { label: '普通员工', value: 'employee' }
+      ]
+    : [{ label: '普通员工', value: 'employee' }]
+))
+
+const searchForm = reactive({ username: '', role: '', deptId: null, status: null })
 const tableData = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
@@ -130,12 +161,43 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增用户')
 const formRef = ref(null)
-const form = reactive({ id: null, username: '', realName: '', role: 'employee', status: true, phone: '', email: '' })
+const form = reactive({ id: null, username: '', realName: '', role: 'employee', deptId: null, status: true, phone: '', email: '' })
 
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   realName: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }]
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  deptId: [{ required: true, message: '请选择所属部门', trigger: 'change' }]
+}
+
+const roleLabel = (role) => {
+  if (role === 'superadmin') return '超级管理员'
+  if (role === 'admin') return '管理员'
+  return '普通员工'
+}
+
+const resetForm = () => {
+  form.id = null
+  form.username = ''
+  form.realName = ''
+  form.role = 'employee'
+  form.deptId = isSuperAdminUser.value ? null : userStore.deptId
+  form.status = true
+  form.phone = ''
+  form.email = ''
+}
+
+const loadDeptOptions = async () => {
+  const res = await getDeptOptionsAPI()
+  if (res.code !== 200) {
+    throw new Error(res.msg || '部门下拉加载失败')
+  }
+  deptOptions.value = res.data || []
+  if (!isSuperAdminUser.value) {
+    searchForm.role = 'employee'
+    searchForm.deptId = userStore.deptId
+    form.deptId = userStore.deptId
+  }
 }
 
 const loadList = async () => {
@@ -146,7 +208,8 @@ const loadList = async () => {
       pageSize: pageSize.value,
       username: searchForm.username || undefined,
       role: searchForm.role || undefined,
-      status: searchForm.status === null ? undefined : searchForm.status
+      deptId: searchForm.deptId || undefined,
+      status: !isSuperAdminUser.value && searchForm.status !== null ? searchForm.status : undefined
     }
     const res = await getUserPageAPI(params)
     if (res.code !== 200) {
@@ -169,7 +232,8 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchForm.username = ''
-  searchForm.role = ''
+  searchForm.role = isSuperAdminUser.value ? '' : 'employee'
+  searchForm.deptId = isSuperAdminUser.value ? null : userStore.deptId
   searchForm.status = null
   currentPage.value = 1
   loadList()
@@ -186,15 +250,19 @@ const handleCurrentChange = (val) => {
   loadList()
 }
 
+const canManageRow = (row) => {
+  if (row.role === 'superadmin') return false
+  if (isSuperAdminUser.value) {
+    return row.role === 'admin' || row.role === 'employee'
+  }
+  return row.role === 'employee' && row.deptId === userStore.deptId
+}
+
+const canResetPassword = (row) => canManageRow(row)
+
 const handleAdd = () => {
   dialogTitle.value = '新增用户'
-  form.id = null
-  form.username = ''
-  form.realName = ''
-  form.role = 'employee'
-  form.status = true
-  form.phone = ''
-  form.email = ''
+  resetForm()
   formRef.value?.clearValidate()
   dialogVisible.value = true
 }
@@ -212,6 +280,7 @@ const handleEdit = async (row) => {
       username: detail.username || '',
       realName: detail.realName || '',
       role: detail.role || 'employee',
+      deptId: detail.deptId || (isSuperAdminUser.value ? null : userStore.deptId),
       status: !!detail.status,
       phone: detail.phone || '',
       email: detail.email || ''
@@ -224,6 +293,10 @@ const handleEdit = async (row) => {
 }
 
 const handleDelete = (row) => {
+  if (!canManageRow(row)) {
+    ElMessage.warning('当前账号无权删除该用户')
+    return
+  }
   ElMessageBox.confirm('确认删除该用户?', '提示', { type: 'warning' })
     .then(async () => {
       const res = await deleteUserAPI(row.id)
@@ -237,9 +310,8 @@ const handleDelete = (row) => {
 }
 
 const handleStatusChange = async (row, val) => {
-  if (row.role === 'superadmin') {
-    ElMessage.warning('超级管理员状态不允许修改')
-    row.status = true
+  if (!canManageRow(row)) {
+    ElMessage.warning('当前账号无权修改该用户状态')
     return
   }
   const oldVal = row.status
@@ -254,14 +326,6 @@ const handleStatusChange = async (row, val) => {
     row.status = oldVal
     ElMessage.error(error.message || '状态更新失败')
   }
-}
-
-const canResetPassword = (row) => {
-  if (row.role === 'superadmin') return false
-  if (userStore.role === 'superadmin') {
-    return row.role === 'admin' || row.role === 'employee'
-  }
-  return userStore.role === 'admin' && row.role === 'employee'
 }
 
 const handleResetPassword = async (row) => {
@@ -294,11 +358,11 @@ const handleSave = () => {
   formRef.value?.validate(async (valid) => {
     if (!valid) return
     try {
-      const isCreate = !form.id
       const payload = {
         username: form.username,
         realName: form.realName,
-        role: form.role,
+        role: isSuperAdminUser.value ? form.role : 'employee',
+        deptId: isSuperAdminUser.value ? form.deptId : userStore.deptId,
         status: form.status ? 1 : 0,
         phone: form.phone || '',
         email: form.email || ''
@@ -307,61 +371,22 @@ const handleSave = () => {
       if (res.code !== 200) {
         throw new Error(res.msg || '保存失败')
       }
-
-      if (!isCreate) {
-        ElMessage.success('修改成功')
-        dialogVisible.value = false
-        await loadList()
-        return
-      }
-
-      ElMessage.success('新增成功')
+      ElMessage.success(form.id ? '修改成功' : '新增成功')
       dialogVisible.value = false
       await loadList()
-
-      const createdRole = payload.role
-      if (createdRole === 'superadmin') {
-        ElMessage.warning('已新增用户，请及时设置密码')
-        return
-      }
-
-      if (!canResetPassword({ role: createdRole })) {
-        ElMessage.warning('已新增用户，请联系超级管理员设置密码')
-        return
-      }
-
-      try {
-        await ElMessageBox.confirm('新增成功，建议立即设置初始密码，是否现在设置？', '提醒', {
-          type: 'warning',
-          confirmButtonText: '立即设置',
-          cancelButtonText: '稍后设置'
-        })
-
-        const queryRes = await getUserPageAPI({
-          pageNum: 1,
-          pageSize: 50,
-          username: payload.username
-        })
-        const matched = (queryRes.data?.records || []).find(item => item.username === payload.username)
-        if (!matched?.id) {
-          ElMessage.warning('未定位到新用户，请在列表中点击“设置密码”')
-          return
-        }
-        await handleResetPassword({ id: matched.id, username: matched.username, role: matched.role })
-      } catch (error) {
-        if (error === 'cancel') {
-          ElMessage.info('已保留默认密码，请尽快设置密码')
-          return
-        }
-        ElMessage.error(error.message || '提醒设置密码失败，请在列表中手动设置')
-      }
     } catch (error) {
       ElMessage.error(error.message || '保存失败')
     }
   })
 }
 
-onMounted(() => {
-  loadList()
+onMounted(async () => {
+  try {
+    resetForm()
+    await loadDeptOptions()
+    await loadList()
+  } catch (error) {
+    ElMessage.error(error.message || '初始化失败')
+  }
 })
 </script>

@@ -11,5 +11,7 @@ public class UserQueryDTO extends PageQuery {
 
     private String role;
 
+    private Long deptId;
+
     private Integer status;
 }

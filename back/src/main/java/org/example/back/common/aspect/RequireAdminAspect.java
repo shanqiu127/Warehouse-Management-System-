@@ -1,12 +1,12 @@
 package org.example.back.common.aspect;
 
-import cn.dev33.satoken.stp.StpUtil;
 import org.example.back.common.annotation.RequireAdmin;
-import org.example.back.common.exception.BusinessException;
+import org.example.back.service.AuthzService;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
@@ -18,6 +18,9 @@ import java.lang.reflect.Method;
 @Aspect
 @Component
 public class RequireAdminAspect {
+
+    @Autowired
+    private AuthzService authzService;
 
     /**
      * 在方法执行前进行权限校验
@@ -34,14 +37,8 @@ public class RequireAdminAspect {
             requireAdmin = joinPoint.getTarget().getClass().getAnnotation(RequireAdmin.class);
         }
 
-        // 3. 从 Session 中获取用户角色
-        Object roleObj = StpUtil.getSession().get("role");
-        String role = roleObj == null ? "" : String.valueOf(roleObj).trim().toLowerCase();
-
-        // 4. 校验是否为管理员
-        if (!"admin".equals(role) && !"superadmin".equals(role)) {
-            String message = requireAdmin == null ? "需要管理员权限" : requireAdmin.value();
-            throw BusinessException.forbidden(message);
-        }
+        // 3. 统一走认证上下文，避免切面与业务层分别维护角色判断逻辑。
+        String message = requireAdmin == null ? "需要管理员权限" : requireAdmin.value();
+        authzService.requireAdminOrSuperAdmin(message);
     }
 }

@@ -1,76 +1,53 @@
 <template>
-  <div class="admin-dashboard">
-    <div class="glass-orb shape-1" style="background: #fee2e2;"></div>
-    <div class="glass-orb shape-2" style="background: #e0e7ff;"></div>
-    
-    <div class="content-wrapper">
-      <header class="admin-header">
-        <div class="header-text">
-          <span class="eyebrow">WORKSPACE / SUPER ADMIN</span>
-          <h1>Welcome back, <br/> <span class="highlight-sa">{{ summary.realName || summary.username || 'SuperAdmin' }}</span></h1>
-        </div>
-        <div class="header-date">
-          <div class="glass-chip">
-            <span class="status-dot" :class="summary.dbStatus === '正常' ? 'ok' : 'bad'"></span>
-            DB Status: {{ summary.dbStatus || 'UNKNOWN' }}
-          </div>
+  <div class="super-dashboard">
+    <div class="dashboard-shell">
+      <header class="hero-card">
+        <div>
+          <p class="eyebrow">SUPER ADMIN</p>
+          <h1>{{ summary.realName || summary.username || '超级管理员' }}</h1>
+          <p class="hero-desc">全局审计、登录安全与平台运行状态总览</p>
         </div>
       </header>
 
-      <section class="metrics-grid">
-        <div class="metric-glass card-hover">
-          <div class="metric-content">
-            <p>Current Session</p>
-            <h3>{{ formatTime(summary.currentLoginTime) }}</h3>
-          </div>
-        </div>
-        <div class="metric-glass card-hover">
-          <div class="metric-content">
-            <p>Previous Login</p>
-            <h3>{{ formatTime(summary.lastLoginTime) }}</h3>
-          </div>
-        </div>
-        <div class="metric-glass card-hover error-metric">
-          <div class="metric-content">
-            <p style="color: #ef4444;">System Errors (24h)</p>
-            <h3 style="color: #dc2626;">{{ summary.errorCount24h || 0 }} Event(s)</h3>
-          </div>
-        </div>
+      <section class="metric-grid">
+        <article class="metric-card">
+          <span class="metric-label">本次登录</span>
+          <strong>{{ formatTime(summary.currentLoginTime) }}</strong>
+        </article>
+        <article class="metric-card metric-card-danger">
+          <span class="metric-label">24 小时系统错误</span>
+          <strong>{{ summary.errorCount24h || 0 }}</strong>
+        </article>
+        <article class="metric-card metric-card-success">
+          <span class="metric-label">数据库状态</span>
+          <strong>{{ summary.dbStatus || '未知' }}</strong>
+        </article>
       </section>
 
-      <div class="layout-grid-full">
-        <section class="system-status card-glass">
-          <div class="section-header">
-            <h2>System Error Monitor</h2>
-            <div class="action-btn-small" @click="go('/system/operation-log')">Full Audit</div>
-          </div>
-          <div class="status-list">
-            <template v-if="summary.recentErrorLogs && summary.recentErrorLogs.length">
-              <div class="status-item error-item" v-for="(log, idx) in summary.recentErrorLogs" :key="idx">
-                <div class="log-meta">
-                  <span class="time">{{ formatTime(log.createTime) }}</span>
-                  <span class="badge red">{{ log.statusCode }}</span>
-                  <span class="badge dark">{{ log.errorType }}</span>
-                </div>
-                <div class="log-detail">
-                  <div class="uri">{{ log.requestUri }}</div>
-                  <div class="msg">{{ log.message }}</div>
-                </div>
-              </div>
-            </template>
-            <div class="empty-state" v-else>
-              <div class="status-badge success">All Systems Operational</div>
-              <p>No critical anomalies detected in the current cycle.</p>
+      <section class="panel-card">
+        <div class="panel-head">
+          <h2>系统错误监控</h2>
+          <button type="button" class="audit-link" @click="go('/system/operation-log')">查看完整审计</button>
+        </div>
+        <div v-if="summary.recentErrorLogs?.length" class="log-list">
+          <article v-for="(log, idx) in summary.recentErrorLogs" :key="idx" class="log-item">
+            <div class="log-top">
+              <span>{{ formatTime(log.createTime) }}</span>
+              <span class="log-badge">{{ log.statusCode }}</span>
+              <span class="log-type">{{ log.errorType }}</span>
             </div>
-          </div>
-        </section>
-      </div>
+            <div class="log-uri">{{ log.requestUri }}</div>
+            <div class="log-message">{{ log.message }}</div>
+          </article>
+        </div>
+        <div v-else class="empty-state">当前周期内未发现新的严重异常。</div>
+      </section>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
@@ -86,61 +63,199 @@ const formatTime = (val) => {
 const loadSummary = async () => {
   try {
     const res = await getHomeSummaryAPI()
-    if (res.code === 200) summary.value = { ...summary.value, ...res.data }
-  } catch (error) {
-    ElMessage.error('Failed to load SuperAdmin summary')
+    if (res.code === 200) {
+      summary.value = { ...summary.value, ...res.data }
+    }
+  } catch {
+    ElMessage.error('首页摘要加载失败')
   }
 }
 
 const go = (path) => router.push(path)
-onMounted(() => { loadSummary() })
+
+onMounted(() => {
+  loadSummary()
+})
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-.admin-dashboard {
-  --bg-color: #f6f8fb;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  position: relative; min-height: calc(100vh - 100px); background: var(--bg-color); font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text-primary); overflow: hidden; padding: 40px; z-index: 1;
+
+.super-dashboard {
+  min-height: calc(100vh - 100px);
+  padding: 36px;
+  background:
+    radial-gradient(circle at top right, rgba(185, 28, 28, 0.12), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(37, 99, 235, 0.1), transparent 28%),
+    linear-gradient(180deg, #f7fafc 0%, #edf4f7 100%);
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
-.glass-orb { position: absolute; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.6; }
-.shape-1 { width: 500px; height: 500px; top: -150px; right: -100px; }
-.shape-2 { width: 600px; height: 600px; bottom: -200px; left: -200px; }
-.content-wrapper { max-width: 1280px; margin: 0 auto; }
-.admin-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 48px; animation: slideDown 0.6s ease-out; }
-.eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 12px; display: block; }
-.admin-header h1 { font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin: 0; }
-.highlight-sa { background: linear-gradient(135deg, #b91c1c, #4338ca); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.glass-chip { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); padding: 10px 20px; border-radius: 100px; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; }
-.status-dot.ok { background: #10b981; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
-.status-dot.bad { background: #ef4444; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2); }
-.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px; animation: slideUp 0.6s ease-out 0.1s both; }
-.metric-glass { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 24px; padding: 24px; display: flex; align-items: flex-start; gap: 16px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05); transition: all 0.3s ease; }
-.card-hover:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 20px 40px -10px rgba(0,0,0,0.08); border-color: rgba(255,255,255,0.8); }
-.error-metric { background: rgba(254, 242, 242, 0.6); border-color: rgba(254, 226, 226, 1); }
-.metric-content p { margin: 0 0 4px; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
-.metric-content h3 { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
-.layout-grid-full { display: grid; grid-template-columns: 1fr; gap: 24px; animation: slideUp 0.6s ease-out 0.2s both; }
-.card-glass { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 24px; padding: 32px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05); }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.section-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
-.action-btn-small { font-size: 0.875rem; font-weight: 600; color: #4338ca; cursor: pointer; padding: 6px 12px; border-radius: 100px; background: rgba(67, 56, 202, 0.1); transition: all 0.2s; }
-.action-btn-small:hover { background: rgba(67, 56, 202, 0.2); }
-.status-list { display: flex; flex-direction: column; gap: 12px; }
-.status-item { background: white; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; border: 1px solid transparent; transition: all 0.2s; }
-.status-item.error-item:hover { border-color: #fee2e2; transform: translateX(4px); box-shadow: 0 4px 12px rgba(239,68,68,0.05); }
-.log-meta { display: flex; gap: 12px; align-items: center; font-size: 0.75rem; font-family: monospace; }
-.log-meta .time { color: var(--text-secondary); }
-.badge { padding: 4px 8px; border-radius: 6px; font-weight: 700; }
-.badge.red { background: #fee2e2; color: #b91c1c; }
-.badge.dark { background: #f3f4f6; color: #374151; }
-.log-detail .uri { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
-.log-detail .msg { font-size: 0.875rem; color: var(--text-secondary); }
-.empty-state { text-align: center; padding: 40px; color: var(--text-secondary); }
-@keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.dashboard-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.hero-card,
+.metric-card,
+.panel-card,
+.log-item {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 45px -30px rgba(15, 23, 42, 0.3);
+}
+
+.hero-card {
+  border-radius: 28px;
+  padding: 32px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: #b91c1c;
+}
+
+.hero-card h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  line-height: 1.06;
+  color: #0f172a;
+}
+
+.hero-desc {
+  margin: 14px 0 0;
+  color: #475569;
+  font-size: 1rem;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.metric-card {
+  border-radius: 22px;
+  padding: 22px;
+  display: grid;
+  gap: 8px;
+}
+
+.metric-card-danger {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.metric-card-success {
+  border-color: rgba(74, 222, 128, 0.42);
+  background: rgba(240, 253, 244, 0.96);
+}
+
+.metric-label {
+  font-size: 0.86rem;
+  color: #64748b;
+}
+
+.metric-card strong {
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.metric-card-success strong {
+  color: #15803d;
+}
+
+.panel-card {
+  border-radius: 28px;
+  padding: 28px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #0f172a;
+}
+
+.audit-link {
+  border: none;
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.log-list {
+  display: grid;
+  gap: 12px;
+}
+
+.log-item {
+  border-radius: 18px;
+  padding: 18px 20px;
+}
+
+.log-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+}
+
+.log-badge {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.log-type {
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.log-uri {
+  color: #0f172a;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.log-message,
+.empty-state {
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+@media (max-width: 960px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card,
+  .panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
 </style>

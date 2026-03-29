@@ -1,4 +1,4 @@
-import { canAccessRoles, getRole } from '@/utils/auth'
+import { canAccessRoles, getDeptCode, getRole, hasDeptAccess } from '@/utils/auth'
 
 /**
  * 自定义指令：v-permission
@@ -10,10 +10,24 @@ export default {
   mounted(el, binding) {
     const { value } = binding
     const role = getRole()
+    const deptCode = getDeptCode()
 
-    if (value && value instanceof Array && value.length > 0) {
-      const permissionRoles = value
-      const allowed = canAccessRoles(role, permissionRoles)
+    let allowRoles = []
+    let allowDeptCodes = []
+
+    if (Array.isArray(value)) {
+      allowRoles = value
+    } else if (value && typeof value === 'object') {
+      allowRoles = Array.isArray(value.roles) ? value.roles : []
+      allowDeptCodes = Array.isArray(value.deptCodes) ? value.deptCodes : []
+    } else {
+      throw new Error(`需要指定权限角色，如 v-permission="['admin']" 或 v-permission="{ roles: ['admin'], deptCodes: ['warehouse'] }"`)
+    }
+
+    if (allowRoles.length > 0 || allowDeptCodes.length > 0) {
+      const roleAllowed = allowRoles.length === 0 || canAccessRoles(role, allowRoles)
+      const deptAllowed = allowDeptCodes.length === 0 || hasDeptAccess(deptCode, allowDeptCodes, role)
+      const allowed = roleAllowed && deptAllowed
 
       if (!allowed) {
         // 对可交互元素优先禁用并提示，其他元素再移除。
@@ -30,8 +44,6 @@ export default {
         }
         el.parentNode && el.parentNode.removeChild(el)
       }
-    } else {
-      throw new Error(`需要指定权限角色，如 v-permission="['admin']"`)
     }
   }
 }

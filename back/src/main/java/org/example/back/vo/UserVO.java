@@ -15,6 +15,12 @@ public class UserVO {
 
     private String role;
 
+    private Long deptId;
+
+    private String deptCode;
+
+    private String deptName;
+
     private Boolean status;
 
     private String phone;

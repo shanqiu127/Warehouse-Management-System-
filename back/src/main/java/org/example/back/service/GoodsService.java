@@ -35,10 +35,32 @@ public class GoodsService {
     @Autowired
     private BaseSupplierMapper baseSupplierMapper;
 
+    @Autowired
+    private AuthzService authzService;
+
+    private void requireGoodsModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_WAREHOUSE, "仅仓储部门管理员可访问商品资料");
+    }
+
+    private void requireGoodsPageAccess(boolean warningOnly) {
+        if (warningOnly) {
+            authzService.requireAnyDeptAdminOrSuperAdmin(
+                    "仅仓储、采购或销售部门管理员可访问预警中心",
+                    AuthzService.DEPT_WAREHOUSE,
+                    AuthzService.DEPT_PURCHASE,
+                    AuthzService.DEPT_SALES
+            );
+            return;
+        }
+        requireGoodsModuleAccess();
+    }
+
     public PageResult<GoodsVO> page(GoodsQueryDTO queryDTO) {
-        LambdaQueryWrapper<BaseGoods> wrapper = new LambdaQueryWrapper<>();
         String warningType = queryDTO.getWarningType() == null ? "" : queryDTO.getWarningType().trim().toLowerCase(Locale.ROOT);
         boolean warningOnly = Boolean.TRUE.equals(queryDTO.getWarningOnly());
+        requireGoodsPageAccess(warningOnly);
+
+        LambdaQueryWrapper<BaseGoods> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getGoodsName()), BaseGoods::getGoodsName, queryDTO.getGoodsName())
                 .eq(queryDTO.getSupplierId() != null, BaseGoods::getSupplierId, queryDTO.getSupplierId())
                 .eq(queryDTO.getStatus() != null, BaseGoods::getStatus, queryDTO.getStatus())
@@ -53,6 +75,12 @@ public class GoodsService {
     }
 
     public List<OptionVO> options() {
+        authzService.requireAnyDeptAdminOrSuperAdmin(
+            "仅仓储、采购或销售部门管理员可获取商品选项",
+            AuthzService.DEPT_WAREHOUSE,
+            AuthzService.DEPT_PURCHASE,
+            AuthzService.DEPT_SALES
+        );
         LambdaQueryWrapper<BaseGoods> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BaseGoods::getStatus, 1).orderByAsc(BaseGoods::getGoodsName);
         return baseGoodsMapper.selectList(wrapper).stream()
@@ -61,12 +89,14 @@ public class GoodsService {
     }
 
     public GoodsVO getById(Long id) {
+        requireGoodsModuleAccess();
         BaseGoods goods = requireGoods(id);
         BaseSupplier supplier = baseSupplierMapper.selectById(goods.getSupplierId());
         return toVO(goods, supplier);
     }
 
     public void create(GoodsSaveDTO dto) {
+        requireGoodsModuleAccess();
         checkGoodsNameUnique(dto.getGoodsName(), null);
         requireSupplier(dto.getSupplierId());
         validateGoodsPricing(dto.getPurchasePrice(), dto.getSalePrice());
@@ -82,6 +112,7 @@ public class GoodsService {
     }
 
     public void update(Long id, GoodsSaveDTO dto) {
+        requireGoodsModuleAccess();
         requireSupplier(dto.getSupplierId());
         BaseGoods goods = requireGoods(id);
         checkGoodsNameUnique(dto.getGoodsName(), id);
@@ -103,6 +134,7 @@ public class GoodsService {
     }
 
     public void delete(Long id) {
+        requireGoodsModuleAccess();
         requireGoods(id);
         baseGoodsMapper.deleteById(id);
     }

@@ -9,5 +9,9 @@ public class NoticeQueryDTO extends PageQuery {
 
     private String title;
 
+    private String targetRole;
+
+    private Long targetDeptId;
+
     private Integer status;
 }

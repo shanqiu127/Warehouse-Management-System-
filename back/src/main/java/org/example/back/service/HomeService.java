@@ -44,6 +44,9 @@ public class HomeService {
         vo.setUsername(userInfo.getUsername());
         vo.setRealName(userInfo.getRealName());
         vo.setRole(userInfo.getRole());
+        vo.setDeptId(userInfo.getDeptId());
+        vo.setDeptCode(userInfo.getDeptCode());
+        vo.setDeptName(userInfo.getDeptName());
         vo.setCurrentLoginTime(user == null ? null : user.getCurrentLoginTime());
         vo.setLastLoginTime(user == null ? null : user.getLastLoginTime());
         vo.setServerTime(LocalDateTime.now());

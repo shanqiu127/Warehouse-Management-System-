@@ -12,10 +12,12 @@ import org.example.back.dto.PurchaseQueryDTO;
 import org.example.back.dto.PurchaseSaveDTO;
 import org.example.back.entity.BaseGoods;
 import org.example.back.entity.BaseSupplier;
+import org.example.back.entity.BizApprovalOrder;
 import org.example.back.entity.BizPurchase;
 import org.example.back.entity.BizPurchaseReturn;
 import org.example.back.mapper.BaseGoodsMapper;
 import org.example.back.mapper.BaseSupplierMapper;
+import org.example.back.mapper.BizApprovalOrderMapper;
 import org.example.back.mapper.BizPurchaseMapper;
 import org.example.back.mapper.BizPurchaseReturnMapper;
 import org.example.back.vo.PurchaseSourceOptionVO;
@@ -30,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,9 +55,20 @@ public class PurchaseService {
     private BizPurchaseReturnMapper bizPurchaseReturnMapper;
 
     @Autowired
+    private BizApprovalOrderMapper bizApprovalOrderMapper;
+
+    @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AuthzService authzService;
+
+    private void requirePurchaseModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_PURCHASE, "仅采购部门管理员可访问进货模块");
+    }
+
     public PageResult<PurchaseVO> page(PurchaseQueryDTO queryDTO) {
+        requirePurchaseModuleAccess();
         LocalDateTime startTime = queryDTO.getStartDate() == null ? null : queryDTO.getStartDate().atStartOfDay();
         LocalDateTime endTime = queryDTO.getEndDate() == null ? null : queryDTO.getEndDate().plusDays(1).atStartOfDay();
 
@@ -72,12 +86,13 @@ public class PurchaseService {
                 .map(BaseGoods::getSupplierId)
                 .filter(id -> id != null)
                 .collect(Collectors.toSet()));
+        Map<Long, BizApprovalOrder> approvalMap = buildLatestApprovalMap(page.getRecords().stream().map(BizPurchase::getId).toList());
 
         List<PurchaseVO> records = page.getRecords().stream()
                 .map(item -> {
                     BaseGoods goods = goodsMap.get(item.getGoodsId());
                     BaseSupplier supplier = goods == null ? null : supplierMap.get(goods.getSupplierId());
-                    return toVO(item, supplier);
+                return toVO(item, supplier, approvalMap.get(item.getId()));
                 })
                 .toList();
 
@@ -85,13 +100,15 @@ public class PurchaseService {
     }
 
     public PurchaseVO getById(Long id) {
+        requirePurchaseModuleAccess();
         BizPurchase purchase = requirePurchase(id);
         BaseGoods goods = baseGoodsMapper.selectById(purchase.getGoodsId());
         BaseSupplier supplier = goods == null ? null : baseSupplierMapper.selectById(goods.getSupplierId());
-        return toVO(purchase, supplier);
+        return toVO(purchase, supplier, resolveLatestApproval(purchase.getId()));
     }
 
     public List<PurchaseSourceOptionVO> returnableOptions(Long goodsId) {
+        requirePurchaseModuleAccess();
         LambdaQueryWrapper<BizPurchase> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BizPurchase::getBizStatus, 1)
                 .eq(goodsId != null, BizPurchase::getGoodsId, goodsId)
@@ -138,6 +155,7 @@ public class PurchaseService {
 
     @Transactional(rollbackFor = Exception.class)
     public void create(PurchaseSaveDTO dto) {
+        requirePurchaseModuleAccess();
         validateQuantity(dto.getQuantity());
 
         BaseGoods goods = requireGoods(dto.getGoodsId());
@@ -166,6 +184,7 @@ public class PurchaseService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        requirePurchaseModuleAccess();
         BizPurchase purchase = requirePurchase(id);
         ensureNormalStatus(purchase.getBizStatus(), "进货单");
         validateDeleteWindow(purchase.getOperationTime(), "进货单");
@@ -175,6 +194,7 @@ public class PurchaseService {
 
     @Transactional(rollbackFor = Exception.class)
     public void voidDocument(Long id, DocumentVoidDTO dto) {
+        requirePurchaseVoidExecutionAccess();
         BizPurchase purchase = requirePurchase(id);
         ensureNormalStatus(purchase.getBizStatus(), "进货单");
 
@@ -211,6 +231,16 @@ public class PurchaseService {
             redFlushDoc.setVoidReason(reason);
             bizPurchaseMapper.insert(redFlushDoc);
         }
+    }
+
+    private void requirePurchaseVoidExecutionAccess() {
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_WAREHOUSE)) {
+            return;
+        }
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_PURCHASE)) {
+            throw BusinessException.validateFail("历史进货单作废/红冲需提交仓储审批");
+        }
+        throw BusinessException.forbidden("仅采购部门管理员可发起进货作废申请，且需由仓储部门审批");
     }
 
     private BizPurchase requirePurchase(Long id) {
@@ -317,7 +347,26 @@ public class PurchaseService {
         return baseSupplierMapper.selectList(wrapper).stream().collect(Collectors.toMap(BaseSupplier::getId, Function.identity()));
     }
 
-    private PurchaseVO toVO(BizPurchase purchase, BaseSupplier supplier) {
+    private Map<Long, BizApprovalOrder> buildLatestApprovalMap(List<Long> bizIds) {
+        if (bizIds.isEmpty()) {
+            return Map.of();
+        }
+        LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizApprovalOrder::getBizType, "purchase")
+                .in(BizApprovalOrder::getBizId, bizIds)
+                .orderByDesc(BizApprovalOrder::getId);
+        Map<Long, BizApprovalOrder> approvalMap = new LinkedHashMap<>();
+        for (BizApprovalOrder item : bizApprovalOrderMapper.selectList(wrapper)) {
+            approvalMap.putIfAbsent(item.getBizId(), item);
+        }
+        return approvalMap;
+    }
+
+    private BizApprovalOrder resolveLatestApproval(Long bizId) {
+        return buildLatestApprovalMap(List.of(bizId)).get(bizId);
+    }
+
+    private PurchaseVO toVO(BizPurchase purchase, BaseSupplier supplier, BizApprovalOrder approvalOrder) {
         PurchaseVO vo = new PurchaseVO();
         BeanUtils.copyProperties(purchase, vo);
         LocalDateTime bizTime = purchase.getOperationTime() == null ? purchase.getCreateTime() : purchase.getOperationTime();
@@ -332,6 +381,8 @@ public class PurchaseService {
         vo.setSourceId(purchase.getSourceId());
         vo.setVoidTime(purchase.getVoidTime());
         vo.setVoidReason(purchase.getVoidReason());
+        vo.setApprovalStatus(approvalOrder == null ? null : approvalOrder.getStatus());
+        vo.setApprovalRequestAction(approvalOrder == null ? null : approvalOrder.getRequestAction());
         return vo;
     }
 }

@@ -15,6 +15,11 @@ public class NoticeSaveDTO {
     @NotBlank(message = "公告内容不能为空")
     private String content;
 
+    @NotBlank(message = "公告受众角色不能为空")
+    private String targetRole;
+
+    private Long targetDeptId;
+
     @NotNull(message = "公告状态不能为空")
     private Integer status;
 

@@ -16,6 +16,12 @@ public class HomeSummaryVO {
 
     private String role;
 
+    private Long deptId;
+
+    private String deptCode;
+
+    private String deptName;
+
     private LocalDateTime currentLoginTime;
 
     private LocalDateTime lastLoginTime;

@@ -23,6 +23,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
     private static final List<String> WHITE_LIST = Arrays.asList(
             "/auth/login",         // 登录接口
             "/auth/register",           // 注册接口（仅普通用户）
+            "/auth/depts",              // 注册页部门下拉
             "/auth/captcha",            // 验证码接口（如有）
             "/swagger-ui/**",           // Swagger UI
             "/swagger-resources/**",    // Swagger 资源

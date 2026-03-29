@@ -145,6 +145,7 @@ import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { loadECharts } from '@/utils/echartsLoader'
 import { useUserStore } from '@/stores/user'
+import { normalizeDeptCode } from '@/utils/auth'
 import {
   getChartOverviewAPI,
   getChartTop5API,
@@ -156,7 +157,7 @@ import {
 } from '@/api/business'
 
 const userStore = useUserStore()
-const canViewProfit = computed(() => userStore.role === 'admin')
+const canViewProfit = computed(() => userStore.role === 'admin' && normalizeDeptCode(userStore.deptCode) === 'finance')
 
 const viewMode = ref('sales')
 const profitExplainActiveNames = ref([])

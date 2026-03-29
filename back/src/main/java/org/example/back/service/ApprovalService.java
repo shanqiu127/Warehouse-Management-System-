@@ -85,18 +85,19 @@ public class ApprovalService {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AuthzService authzService;
+
     @Transactional(rollbackFor = Exception.class)
     public void create(ApprovalCreateDTO dto) {
         LoginResponse.UserInfoVO requester = requireLoginUser();
         String role = normalizeRole(requester.getRole());
-        if (!ROLE_EMPLOYEE.equals(role)) {
-            throw BusinessException.forbidden("仅普通员工可提交作废审批申请");
-        }
 
         String bizType = normalizeText(dto.getBizType());
         String action = normalizeText(dto.getRequestAction());
         validateBizType(bizType);
         validateAction(action);
+        ensureRequesterCanSubmitApproval(requester, role, bizType);
 
         BizDocumentMeta meta = resolveBizMeta(bizType, dto.getBizId());
         ensureCanSubmitVoidApproval(meta);
@@ -125,7 +126,7 @@ public class ApprovalService {
     }
 
     public PageResult<ApprovalOrderVO> page(ApprovalQueryDTO queryDTO) {
-        requireAdminRole();
+        requireApprovalModuleAccess();
         String approvalNoKeyword = trimText(queryDTO.getApprovalNo()).toUpperCase(Locale.ROOT);
 
         LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
@@ -143,7 +144,7 @@ public class ApprovalService {
     }
 
     public Long pendingCount() {
-        requireAdminRole();
+        requireApprovalModuleAccess();
         LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BizApprovalOrder::getStatus, STATUS_PENDING);
         return bizApprovalOrderMapper.selectCount(wrapper);
@@ -151,7 +152,7 @@ public class ApprovalService {
 
     @Transactional(rollbackFor = Exception.class)
     public void approve(Long id, ApprovalDecisionDTO dto) {
-        LoginResponse.UserInfoVO approver = requireAdminRole();
+        LoginResponse.UserInfoVO approver = requireApprovalModuleAccess();
         BizApprovalOrder entity = claimPendingOrder(id, approver);
         BizDocumentMeta beforeMeta = resolveBizMeta(entity.getBizType(), entity.getBizId());
 
@@ -166,7 +167,7 @@ public class ApprovalService {
 
     @Transactional(rollbackFor = Exception.class)
     public void reject(Long id, ApprovalDecisionDTO dto) {
-        LoginResponse.UserInfoVO approver = requireAdminRole();
+        LoginResponse.UserInfoVO approver = requireApprovalModuleAccess();
         BizApprovalOrder entity = claimPendingOrder(id, approver);
         BizDocumentMeta currentMeta = resolveBizMeta(entity.getBizType(), entity.getBizId());
 
@@ -361,12 +362,28 @@ public class ApprovalService {
         throw BusinessException.validateFail("不支持的申请动作: " + action);
     }
 
-    private LoginResponse.UserInfoVO requireAdminRole() {
-        LoginResponse.UserInfoVO user = requireLoginUser();
-        String role = normalizeRole(user.getRole());
-        if (!ROLE_ADMIN.equals(role)) {
-            throw BusinessException.forbidden("仅管理员可执行审批操作");
+    private void ensureRequesterCanSubmitApproval(LoginResponse.UserInfoVO requester, String role, String bizType) {
+        if (ROLE_EMPLOYEE.equals(role)) {
+            return;
         }
+        if (!ROLE_ADMIN.equals(role)) {
+            throw BusinessException.forbidden("当前角色无权提交作废审批申请");
+        }
+
+        String deptCode = authzService.normalizeDeptCode(requester.getDeptCode());
+        boolean purchaseAdminRequest = AuthzService.DEPT_PURCHASE.equals(deptCode)
+                && ("purchase".equals(bizType) || "purchase_return".equals(bizType));
+        boolean salesAdminRequest = AuthzService.DEPT_SALES.equals(deptCode)
+                && ("sales".equals(bizType) || "sales_return".equals(bizType));
+        if (purchaseAdminRequest || salesAdminRequest) {
+            return;
+        }
+        throw BusinessException.forbidden("仅采购或销售部门管理员可提交该类作废审批申请");
+    }
+
+    private LoginResponse.UserInfoVO requireApprovalModuleAccess() {
+        LoginResponse.UserInfoVO user = requireLoginUser();
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_WAREHOUSE, "仅仓储部门管理员可执行审批操作");
         return user;
     }
 

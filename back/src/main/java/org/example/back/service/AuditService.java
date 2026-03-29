@@ -29,6 +29,9 @@ public class AuditService {
     @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AuthzService authzService;
+
     public PageResult<SysLoginLog> loginLogPage(LoginLogQueryDTO queryDTO) {
         requireSuperAdmin();
         LocalDateTime startTime = queryDTO.getStartDate() == null ? null : queryDTO.getStartDate().atStartOfDay();
@@ -85,10 +88,6 @@ public class AuditService {
     }
 
     private void requireSuperAdmin() {
-        LoginResponse.UserInfoVO userInfo = authService.getUserInfo();
-        String role = userInfo == null ? "" : String.valueOf(userInfo.getRole()).trim().toLowerCase();
-        if (!"superadmin".equals(role)) {
-            throw BusinessException.forbidden("仅超级管理员可访问审计日志模块");
-        }
+        authzService.requireSuperAdmin("仅超级管理员可访问审计日志模块");
     }
 }

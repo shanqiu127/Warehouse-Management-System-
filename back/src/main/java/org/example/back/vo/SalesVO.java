@@ -45,4 +45,10 @@ public class SalesVO {
     private String voidReason;
 
     private LocalDateTime createTime;
+
+    private Integer isDeleted;
+
+    private Integer approvalStatus;
+
+    private String approvalRequestAction;
 }

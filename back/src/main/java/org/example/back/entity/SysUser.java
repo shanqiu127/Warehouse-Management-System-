@@ -39,6 +39,11 @@ public class SysUser {
     private String role;
 
     /**
+     * 所属部门ID，超级管理员允许为空
+     */
+    private Long deptId;
+
+    /**
      * 状态：0-停用，1-启用
      */
     private Integer status;

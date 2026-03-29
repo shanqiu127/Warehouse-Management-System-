@@ -9,11 +9,15 @@ import org.example.back.dto.LoginResponse;
 import org.example.back.dto.RegisterRequest;
 import org.example.back.common.result.Result;
 import org.example.back.service.AuthService;
+import org.example.back.service.DeptService;
 import org.example.back.service.LoginLogService;
+import org.example.back.vo.OptionVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.List;
 
 /**
  * 认证控制器
@@ -28,6 +32,9 @@ public class AuthController {
 
     @Autowired
     private LoginLogService loginLogService;
+
+    @Autowired
+    private DeptService deptService;
 
     /**
      * 用户登录接口
@@ -65,6 +72,11 @@ public class AuthController {
     public Result<Void> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
         return Result.success();
+    }
+
+    @GetMapping("/depts")
+    public Result<List<OptionVO>> registerDeptOptions() {
+        return Result.success(deptService.publicOptions());
     }
 
     /**

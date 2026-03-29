@@ -7,7 +7,9 @@ import org.example.back.dto.LoginRequest;
 import org.example.back.dto.LoginResponse;
 import org.example.back.dto.RegisterRequest;
 import org.example.back.entity.SysUser;
+import org.example.back.entity.SysDept;
 import org.example.back.common.exception.BusinessException;
+import org.example.back.mapper.SysDeptMapper;
 import org.example.back.mapper.SysUserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,12 +22,15 @@ import java.time.LocalDateTime;
 @Service
 public class AuthService {
 
-    private static final String ROLE_superadmin = "superadmin";
+    private static final String ROLE_SUPERADMIN = "superadmin";
     private static final String ROLE_ADMIN = "admin";
     private static final String ROLE_EMPLOYEE = "employee";
 
     @Autowired
     private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private SysDeptMapper sysDeptMapper;
 
     /**
      * 用户登录
@@ -62,8 +67,7 @@ public class AuthService {
         StpUtil.login(user.getId());
 
         LoginResponse.UserInfoVO userInfo = buildUserInfoVO(user);
-        StpUtil.getSession().set("userInfo", userInfo);
-        StpUtil.getSession().set("role", userInfo.getRole());
+        syncLoginSession(userInfo);
 
         String tokenValue = StpUtil.getTokenValue();
         return new LoginResponse(tokenValue, userInfo);
@@ -86,7 +90,9 @@ public class AuthService {
                 ? request.getUsername()
                 : request.getRealName());
         user.setRole(ROLE_EMPLOYEE);
+        user.setDeptId(request.getDeptId());
         user.setStatus(1);
+        requireDept(request.getDeptId());
         sysUserMapper.insert(user);
     }
 
@@ -106,13 +112,15 @@ public class AuthService {
                 (LoginResponse.UserInfoVO) StpUtil.getSession().get("userInfo");
 
         if (userInfo == null) {
-            SysUser user = sysUserMapper.selectById((Long) loginId);
+            SysUser user = sysUserMapper.selectById(Long.valueOf(String.valueOf(loginId)));
             if (user == null) {
                 throw BusinessException.notFound("用户不存在");
             }
+            user.setRole(normalizeRole(user.getRole()));
             userInfo = buildUserInfoVO(user);
-            StpUtil.getSession().set("userInfo", userInfo);
         }
+
+        syncLoginSession(userInfo);
 
         return userInfo;
     }
@@ -137,8 +145,17 @@ public class AuthService {
         vo.setUsername(user.getUsername());
         vo.setRealName(user.getRealName());
         vo.setRole(user.getRole());
+        vo.setDeptId(user.getDeptId());
         vo.setCurrentLoginTime(user.getCurrentLoginTime());
         vo.setLastLoginTime(user.getLastLoginTime());
+
+        if (user.getDeptId() != null) {
+            SysDept dept = requireDept(user.getDeptId());
+            vo.setDeptCode(normalizeDeptCode(dept.getDeptCode()));
+            vo.setDeptName(dept.getDeptName());
+        } else if (!ROLE_SUPERADMIN.equals(normalizeRole(user.getRole()))) {
+            throw BusinessException.validateFail("当前账号未配置所属部门");
+        }
         return vo;
     }
 
@@ -150,7 +167,7 @@ public class AuthService {
     public boolean isAdmin() {
         LoginResponse.UserInfoVO userInfo = getUserInfo();
         String role = normalizeRole(userInfo.getRole());
-        return ROLE_ADMIN.equals(role) || ROLE_superadmin.equals(role);
+        return ROLE_ADMIN.equals(role) || ROLE_SUPERADMIN.equals(role);
     }
 
     private String normalizeRole(String role) {
@@ -158,5 +175,35 @@ public class AuthService {
             return "";
         }
         return role.trim().toLowerCase();
+    }
+
+    private String normalizeDeptCode(String deptCode) {
+        if (deptCode == null) {
+            return "";
+        }
+        return deptCode.trim().toLowerCase();
+    }
+
+    private SysDept requireDept(Long deptId) {
+        SysDept dept = sysDeptMapper.selectById(deptId);
+        if (dept == null) {
+            throw BusinessException.validateFail("所属部门不存在");
+        }
+        return dept;
+    }
+
+    private void syncLoginSession(LoginResponse.UserInfoVO userInfo) {
+        StpUtil.getSession().set("userInfo", userInfo);
+        StpUtil.getSession().set("role", normalizeRole(userInfo.getRole()));
+        if (userInfo.getDeptId() != null) {
+            StpUtil.getSession().set("deptId", userInfo.getDeptId());
+        } else {
+            StpUtil.getSession().delete("deptId");
+        }
+        if (userInfo.getDeptCode() != null && !userInfo.getDeptCode().isBlank()) {
+            StpUtil.getSession().set("deptCode", normalizeDeptCode(userInfo.getDeptCode()));
+        } else {
+            StpUtil.getSession().delete("deptCode");
+        }
     }
 }

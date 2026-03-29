@@ -71,6 +71,12 @@
             />
           </el-form-item>
 
+          <el-form-item prop="deptId">
+            <el-select v-model="form.deptId" placeholder="请选择所属部门" size="large" style="width: 100%;">
+              <el-option v-for="dept in deptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
+            </el-select>
+          </el-form-item>
+
           <el-form-item>
             <el-button type="primary" size="large" class="submit-btn" :loading="submitting" @click="handleRegister">
               创建账号
@@ -87,16 +93,17 @@
   </div>
 </template>
 <script setup>
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { registerAPI } from '@/api/user'
+import { getRegisterDeptOptionsAPI, registerAPI } from '@/api/user'
 
 const router = useRouter()
 const formRef = ref(null)
 const submitting = ref(false)
+const deptOptions = ref([])
 
-const form = reactive({ username: '', realName: '', password: '', confirmPassword: '' })
+const form = reactive({ username: '', realName: '', password: '', confirmPassword: '', deptId: null })
 const validatePass = (rule, value, callback) => {
   if (value === '') { callback(new Error('请再次输入密码')) }
   else if (value !== form.password) { callback(new Error('两次输入密码不一致!')) }
@@ -106,7 +113,20 @@ const rules = {
   username: [{ required: true, message: '账号不可为空', trigger: 'blur' }],
   realName: [{ required: true, message: '真实姓名不可为空', trigger: 'blur' }],
   password: [{ required: true, message: '密码不可为空', trigger: 'blur' }],
-  confirmPassword: [{ validator: validatePass, trigger: 'blur' }]
+  confirmPassword: [{ validator: validatePass, trigger: 'blur' }],
+  deptId: [{ required: true, message: '请选择所属部门', trigger: 'change' }]
+}
+
+const loadDeptOptions = async () => {
+  try {
+    const res = await getRegisterDeptOptionsAPI()
+    if (res.code !== 200) {
+      throw new Error(res.msg || '部门列表加载失败')
+    }
+    deptOptions.value = res.data || []
+  } catch (error) {
+    ElMessage.error(error.message || '部门列表加载失败')
+  }
 }
 
 const handleRegister = () => {
@@ -114,17 +134,21 @@ const handleRegister = () => {
     if (valid) {
       submitting.value = true
       try {
-        await registerAPI({ username: form.username, realName: form.realName, password: form.password })
+        await registerAPI({ username: form.username, realName: form.realName, password: form.password, deptId: form.deptId })
         ElMessage.success('注册成功，请登录')
         router.push('/login')
       } catch (error) {
-        ElMessage.error(error?.response?.data?.msg || '当前版本后端尚未开放注册接口，请联系管理员创建账号')
+        ElMessage.error(error?.response?.data?.msg || error.message || '注册失败')
       } finally {
         submitting.value = false
       }
     }
   })
 }
+
+onMounted(() => {
+  loadDeptOptions()
+})
 </script>
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Manrope:wght@400;500;700&display=swap');

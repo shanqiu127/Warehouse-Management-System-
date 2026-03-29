@@ -1,121 +1,88 @@
 <template>
   <div class="admin-dashboard">
-    <div class="glass-orb shape-1"></div>
-    <div class="glass-orb shape-2"></div>
-    
-    <div class="content-wrapper">
-      <header class="admin-header">
-        <div class="header-text">
-          <span class="eyebrow">WORKSPACE / MANAGER</span>
-          <h1>Welcome back, <br/> <span class="highlight">{{ summary.realName || summary.username || 'Admin' }}</span></h1>
+    <div class="dashboard-shell">
+      <header class="hero-card">
+        <div>
+          <p class="eyebrow">DEPARTMENT ADMIN</p>
+          <h1>{{ summary.realName || userStore.realName || '部门管理员' }}</h1>
+          <p class="hero-desc">{{ deptLabel }} · {{ moduleLabel }}</p>
         </div>
-        <div class="header-date">
-          <div class="glass-chip">
-            <span class="status-dot"></span>
-            {{ nowDateText }}
-          </div>
+        <div class="hero-meta">
+          <span>{{ formatTime(summary.currentLoginTime) }}</span>
         </div>
       </header>
 
-      <section class="metrics-grid">
-        <div class="metric-glass card-hover">
-          <div class="metric-icon">
-            <svg viewBox="0 0 24 24" fill="none" class="icon"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" fill="currentColor" fill-opacity="0.1"/><path d="M12 16V12M12 8H12.01M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div class="metric-content">
-            <p>Current Session</p>
-            <h3>{{ formatTime(summary.currentLoginTime) }}</h3>
-          </div>
-        </div>
-        
-        <div class="metric-glass card-hover">
-          <div class="metric-icon">
-            <svg viewBox="0 0 24 24" fill="none" class="icon"><path d="M12 8V12L15 15M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div class="metric-content">
-            <p>Previous Login</p>
-            <h3>{{ formatTime(summary.lastLoginTime) }}</h3>
-          </div>
-        </div>
-
-        <div class="metric-glass card-hover">
-          <div class="metric-icon">
-            <svg viewBox="0 0 24 24" fill="none" class="icon"><path d="M9 12L11 14L15 10M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div class="metric-content">
-            <p>Role</p>
-            <h3>{{ roleLabel }}</h3>
-          </div>
-        </div>
-
-        <div class="metric-glass card-hover" @click="go('/system/void-approval')" style="cursor: pointer;">
-          <div class="metric-icon approval-alert-icon">
-            <svg viewBox="0 0 24 24" fill="none" class="icon"><path d="M12 9V13M12 17H12.01M10.29 3.86L1.82 18A2 2 0 0 0 3.55 21H20.45A2 2 0 0 0 22.18 18L13.71 3.86A2 2 0 0 0 10.29 3.86Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div class="metric-content">
-            <p>Pending Approvals</p>
-            <h3>{{ pendingApprovalCount }}</h3>
-          </div>
-        </div>
+      <section class="metric-grid">
+        <article v-for="item in metricCards" :key="item.label" class="metric-card">
+          <span class="metric-label">{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </article>
       </section>
 
-      <div class="layout-grid">
-        <section class="quick-actions card-glass">
-          <h2>Quick Actions</h2>
-          <div class="actions-wrapper">
-            <div class="action-btn" @click="go('/business/sales-chart')">
-              <div class="icon-wrap bg-blue"><div class="circle"></div></div>
-              <span>Analytics</span>
-            </div>
-            <div class="action-btn" @click="go('/system/void-approval')">
-              <div class="icon-wrap bg-red"><div class="circle"></div></div>
-              <span>Approvals</span>
-            </div>
-            <div class="action-btn" @click="go('/system/notice')">
-              <div class="icon-wrap bg-purple"><div class="circle"></div></div>
-              <span>Notices</span>
-            </div>
-            <div class="action-btn" @click="go('/system/user')">
-              <div class="icon-wrap bg-orange"><div class="circle"></div></div>
-              <span>Users</span>
-            </div>
-            <div class="action-btn" @click="go('/system/employee')">
-              <div class="icon-wrap bg-green"><div class="circle"></div></div>
-              <span>Employees</span>
-            </div>
+      <section class="panel-grid">
+        <article class="panel-card">
+          <div class="panel-head">
+            <h2>快捷入口</h2>
+            <span>{{ quickActions.length }} 项</span>
           </div>
-        </section>
+          <div class="action-grid">
+            <button v-for="item in quickActions" :key="item.path" type="button" class="action-card" @click="go(item.path)">
+              <span class="action-title">{{ item.title }}</span>
+              <span class="action-text">{{ item.description }}</span>
+            </button>
+          </div>
+        </article>
 
-        <section class="system-status card-glass" v-loading="noticeLoading">
-          <h2>Latest Notices</h2>
-          <div class="status-list">
-            <div class="status-item" v-for="item in noticeList" :key="item.id">
-              <div>
-                <div class="status-label">{{ item.title }}</div>
-                <div class="status-sub">{{ formatTime(item.date || item.publishTime) }}</div>
-              </div>
-              <div class="status-badge success">公告</div>
-            </div>
-            <div class="status-empty" v-if="!noticeLoading && noticeList.length === 0">暂无公告数据</div>
+        <article class="panel-card" v-loading="noticeLoading">
+          <div class="panel-head">
+            <h2>最新公告</h2>
+            <span>按当前账号可见范围过滤</span>
           </div>
-        </section>
-      </div>
+          <div v-if="noticeList.length" class="notice-list">
+            <button v-for="item in noticeList" :key="item.id" type="button" class="notice-item" @click="openNotice(item)">
+              <div>
+                <div class="notice-title">{{ item.title }}</div>
+                <div class="notice-meta">{{ audienceLabel(item) }}</div>
+              </div>
+              <span class="notice-date">{{ formatTime(item.date || item.publishTime) }}</span>
+            </button>
+          </div>
+          <div v-else class="empty-state">暂无可见公告</div>
+        </article>
+      </section>
+
+      <el-dialog v-model="noticeDialogVisible" title="公告详情" width="620px">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="标题">{{ noticeDetail.title || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="受众">{{ audienceLabel(noticeDetail) }}</el-descriptions-item>
+          <el-descriptions-item label="发布时间">{{ formatTime(noticeDetail.date || noticeDetail.publishTime) }}</el-descriptions-item>
+          <el-descriptions-item label="发布人">{{ noticeDetail.author || noticeDetail.publisher || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="正文">
+            <p class="notice-content">{{ noticeDetail.content || '-' }}</p>
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-dialog>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
-import { getApprovalPendingCountAPI, getNoticePageAPI } from '@/api/system'
+import { getNoticeDetailAPI, getNoticePageAPI } from '@/api/system'
+import { useUserStore } from '@/stores/user'
+import { normalizeDeptCode } from '@/utils/auth'
 
 const router = useRouter()
+const userStore = useUserStore()
+
 const summary = ref({
   username: '',
   realName: '',
   role: '',
+  deptName: '',
   currentLoginTime: null,
   lastLoginTime: null,
   lowStockCount: 0,
@@ -123,16 +90,89 @@ const summary = ref({
 })
 const noticeList = ref([])
 const noticeLoading = ref(false)
-const pendingApprovalCount = ref(0)
+const noticeDialogVisible = ref(false)
+const noticeDetail = ref({})
 
-const roleLabel = 'Administrator'
+const deptCode = computed(() => normalizeDeptCode(userStore.deptCode))
+const deptLabel = computed(() => summary.value.deptName || userStore.deptName || '未分配部门')
 
-const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
-const nowDateText = new Date().toLocaleDateString('en-US', options)
+const moduleLabelMap = {
+  finance: '财务统计与公告分发',
+  sales: '销售作业、退货与预警协同',
+  warehouse: '仓储资料、预警与审批中心',
+  purchase: '采购进货、退货与预警协同',
+  hr: '人事组织与账号维护中心'
+}
+
+const moduleLabel = computed(() => moduleLabelMap[deptCode.value] || '部门管理员工作台')
+
+const metricCards = computed(() => {
+  const baseCards = [
+    { label: '当前部门', value: deptLabel.value },
+    { label: '公告数量', value: noticeList.value.length },
+  ]
+
+  if (deptCode.value === 'hr' || deptCode.value === 'finance') {
+    return [...baseCards, { label: '上次登录', value: formatTime(summary.value.lastLoginTime) }]
+  }
+
+  return [
+    ...baseCards,
+    { label: '低库存预警', value: summary.value.lowStockCount ?? 0 },
+    { label: '零库存预警', value: summary.value.zeroStockCount ?? 0 },
+    { label: '上次登录', value: formatTime(summary.value.lastLoginTime) }
+  ]
+})
+
+const quickActions = computed(() => {
+  const commonActions = [
+    { path: '/system/notice', title: '公告管理', description: '维护当前账号可发布的公告内容' },
+    { path: '/system/user', title: '用户部门管理', description: '维护本部门用户账号与状态' }
+  ]
+
+  const deptActionsMap = {
+    finance: [
+      { path: '/business/sales-chart', title: '销售统计图表', description: '查看销售额、退货额与毛利趋势' }
+    ],
+    sales: [
+      { path: '/business/sales', title: '商品销售', description: '处理销售单据与审批结果回看' },
+      { path: '/business/sales-return', title: '销售退货', description: '处理销售退货业务与状态追踪' },
+      { path: '/business/stock-warning', title: '预警中心', description: '查看低库存与零库存商品明细' }
+    ],
+    warehouse: [
+      { path: '/base/supplier', title: '供应商管理', description: '维护供应商信息与合作资料' },
+      { path: '/base/goods', title: '商品资料管理', description: '维护库存商品资料与阈值' },
+      { path: '/business/stock-warning', title: '预警中心', description: '集中查看库存异常并跟进处理' },
+      { path: '/system/void-approval', title: '作废审批', description: '审核采购与销售历史单据作废申请' }
+    ],
+    purchase: [
+      { path: '/business/purchase', title: '商品进货', description: '处理进货单据与审批结果回看' },
+      { path: '/business/purchase-return', title: '进货退货', description: '处理进货退货与状态追踪' },
+      { path: '/business/stock-warning', title: '预警中心', description: '查看低库存与零库存商品明细' }
+    ],
+    hr: [
+      { path: '/system/dept', title: '全部门管理', description: '维护部门资料与负责人信息' },
+      { path: '/system/employee', title: '全员工管理', description: '维护跨部门员工档案资料' }
+    ]
+  }
+
+  return [...(deptActionsMap[deptCode.value] || []), ...commonActions]
+})
 
 const formatTime = (val) => {
   if (!val) return '--'
-  return String(val).replace('T', ' ')
+  return String(val).replace('T', ' ').substring(0, 19)
+}
+
+const audienceLabel = (row = {}) => {
+  if (row.targetRole === 'all') return '全员公告'
+  if (row.targetRole === 'admin') {
+    return row.targetDeptName ? `${row.targetDeptName} 管理员` : '管理员公告'
+  }
+  if (row.targetRole === 'employee') {
+    return row.targetDeptName ? `${row.targetDeptName} 员工` : '员工公告'
+  }
+  return '未设置'
 }
 
 const loadSummary = async () => {
@@ -141,33 +181,35 @@ const loadSummary = async () => {
     if (res.code === 200) {
       summary.value = { ...summary.value, ...res.data }
     }
-  } catch (error) {
-    ElMessage.error('Failed to load summary')
+  } catch {
+    ElMessage.error('首页摘要加载失败')
   }
 }
 
 const loadNotices = async () => {
   noticeLoading.value = true
   try {
-    const res = await getNoticePageAPI({ pageNum: 1, pageSize: 3, status: 1 })
+    const res = await getNoticePageAPI({ pageNum: 1, pageSize: 4, status: 1 })
     if (res.code === 200) {
       noticeList.value = res.data?.records || []
     }
-  } catch (error) {
-    ElMessage.error('Failed to load notices')
+  } catch {
+    ElMessage.error('公告加载失败')
   } finally {
     noticeLoading.value = false
   }
 }
 
-const loadPendingCount = async () => {
+const openNotice = async (row) => {
   try {
-    const res = await getApprovalPendingCountAPI()
-    if (res.code === 200) {
-      pendingApprovalCount.value = Number(res.data || 0)
+    const res = await getNoticeDetailAPI(row.id)
+    if (res.code !== 200) {
+      throw new Error(res.msg || '公告详情加载失败')
     }
+    noticeDetail.value = res.data || {}
+    noticeDialogVisible.value = true
   } catch (error) {
-    ElMessage.error('Failed to load pending approvals')
+    ElMessage.error(error.message || '公告详情加载失败')
   }
 }
 
@@ -178,7 +220,6 @@ const go = (path) => {
 onMounted(() => {
   loadSummary()
   loadNotices()
-  loadPendingCount()
 })
 </script>
 
@@ -186,312 +227,200 @@ onMounted(() => {
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 .admin-dashboard {
-  --bg-color: #f6f8fb;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  
-  position: relative;
   min-height: calc(100vh - 100px);
-  background: var(--bg-color);
+  padding: 36px;
+  background:
+    radial-gradient(circle at top right, rgba(14, 116, 144, 0.14), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.1), transparent 28%),
+    linear-gradient(180deg, #f7fafc 0%, #edf4f7 100%);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  color: var(--text-primary);
-  overflow: hidden;
-  padding: 40px;
-  z-index: 1;
 }
 
-.glass-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  z-index: -1;
-  opacity: 0.6;
-}
-
-.shape-1 {
-  width: 400px;
-  height: 400px;
-  background: #e0e7ff;
-  top: -100px;
-  right: -100px;
-}
-
-.shape-2 {
-  width: 500px;
-  height: 500px;
-  background: #fdf4ff;
-  bottom: -200px;
-  left: -200px;
-}
-
-.content-wrapper {
+.dashboard-shell {
   max-width: 1280px;
   margin: 0 auto;
+  display: grid;
+  gap: 24px;
 }
 
-.admin-header {
+.hero-card,
+.metric-card,
+.panel-card,
+.action-card,
+.notice-item {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 45px -30px rgba(15, 23, 42, 0.3);
+}
+
+.hero-card {
+  border-radius: 28px;
+  padding: 32px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  margin-bottom: 48px;
-  animation: slideDown 0.6s ease-out;
+  gap: 24px;
+  align-items: flex-start;
 }
 
 .eyebrow {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  margin-bottom: 12px;
-  display: block;
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: #0f766e;
 }
 
-.admin-header h1 {
-  font-size: 3rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+.hero-card h1 {
   margin: 0;
+  font-size: 2.5rem;
+  line-height: 1.06;
+  color: #0f172a;
 }
 
-.highlight {
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.hero-desc {
+  margin: 14px 0 0;
+  color: #475569;
+  font-size: 1rem;
 }
 
-.glass-chip {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  padding: 10px 20px;
-  border-radius: 100px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
+.hero-meta {
+  display: grid;
+  gap: 10px;
+  min-width: 240px;
+  color: #334155;
+  font-size: 0.95rem;
+  justify-items: end;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px;
+}
+
+.metric-card {
+  border-radius: 22px;
+  padding: 22px;
+  display: grid;
   gap: 8px;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  background: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+.metric-label {
+  font-size: 0.86rem;
+  color: #64748b;
 }
 
-.metrics-grid {
+.metric-card strong {
+  font-size: 1.35rem;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.panel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1.1fr 0.9fr;
   gap: 24px;
-  margin-bottom: 24px;
-  animation: slideUp 0.6s ease-out 0.1s both;
 }
 
-.metric-glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  padding: 24px;
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.panel-card {
+  border-radius: 28px;
+  padding: 28px;
 }
 
-.card-hover:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 20px 40px -10px rgba(0,0,0,0.08);
-  border-color: rgba(255,255,255,0.8);
-}
-
-.metric-icon {
-  width: 48px;
-  height: 48px;
-  background: white;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4f46e5;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-}
-
-.approval-alert-icon {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.metric-icon .icon {
-  width: 24px;
-  height: 24px;
-}
-
-.metric-content p {
-  margin: 0 0 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.metric-content h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.layout-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 24px;
-  animation: slideUp 0.6s ease-out 0.2s both;
-}
-
-.card-glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05);
-}
-
-.card-glass h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0 0 24px;
-}
-
-.actions-wrapper {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 16px;
-}
-
-.action-btn {
-  background: white;
-  border-radius: 20px;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid rgba(0,0,0,0.02);
-}
-
-.action-btn:hover {
-  background: #f8fafc;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 16px -8px rgba(0,0,0,0.05);
-}
-
-.icon-wrap {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-wrap .circle {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.8;
-}
-
-.bg-blue { background: #e0e7ff; color: #4f46e5; }
-.bg-purple { background: #fae8ff; color: #c026d3; }
-.bg-orange { background: #ffedd5; color: #ea580c; }
-.bg-green { background: #d1fae5; color: #059669; }
-.bg-red { background: #fee2e2; color: #dc2626; }
-
-.action-btn span {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-}
-
-.status-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.status-item {
+.panel-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  background: white;
-  border-radius: 16px;
+  margin-bottom: 20px;
 }
 
-.status-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary);
+.panel-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #0f172a;
 }
 
-.status-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
+.panel-head span {
+  color: #64748b;
+  font-size: 0.88rem;
 }
 
-.status-badge {
-  font-size: 0.75rem;
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.action-card {
+  border-radius: 20px;
+  padding: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.action-card:hover,
+.notice-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 45px -34px rgba(15, 23, 42, 0.5);
+}
+
+.action-title {
+  display: block;
+  color: #0f172a;
   font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 100px;
+  margin-bottom: 8px;
 }
 
-.status-badge.success {
-  background: #dcfce7;
-  color: #059669;
+.action-text {
+  display: block;
+  color: #475569;
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
-.status-empty {
-  color: var(--text-secondary);
-  font-size: 13px;
+.notice-list {
+  display: grid;
+  gap: 12px;
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+.notice-item {
+  width: 100%;
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  cursor: pointer;
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+.notice-title {
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
 }
 
-@media (max-width: 992px) {
-  .layout-grid {
+.notice-meta,
+.notice-date,
+.empty-state {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.notice-content {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  margin: 0;
+}
+
+@media (max-width: 960px) {
+  .panel-grid,
+  .action-grid {
     grid-template-columns: 1fr;
   }
-}
 
-@media (max-width: 768px) {
-  .admin-header {
+  .hero-card {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-  .admin-dashboard {
-    padding: 20px;
   }
 }
 </style>

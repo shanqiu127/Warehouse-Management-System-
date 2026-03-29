@@ -15,6 +15,8 @@ public class UserSaveDTO {
     @NotBlank(message = "角色不能为空")
     private String role;
 
+    private Long deptId;
+
     private Integer status;
 
     private String phone;

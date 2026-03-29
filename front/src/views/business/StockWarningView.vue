@@ -3,7 +3,7 @@
     <template #header>
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <span>库存预警中心</span>
-        <el-tag type="warning">仅管理员/员工可见</el-tag>
+        <el-tag v-if="isWarehouseAdmin" type="warning">仓储预警工作台</el-tag>
       </div>
     </template>
 
@@ -18,7 +18,7 @@
       <el-form-item label="商品名称">
         <el-input v-model="searchForm.goodsName" placeholder="请输入商品名称" clearable />
       </el-form-item>
-      <el-form-item label="供应商">
+      <el-form-item v-if="canUseSupplierFilter" label="供应商">
         <el-select v-model="searchForm.supplierId" style="width: 180px;" clearable>
           <el-option v-for="sup in suppliers" :key="sup.id" :label="sup.name" :value="sup.id" />
         </el-select>
@@ -63,18 +63,23 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getStockWarningPageAPI, getSupplierOptionsAPI } from '@/api/base'
+import { useUserStore } from '@/stores/user'
+import { normalizeDeptCode } from '@/utils/auth'
 
 const route = useRoute()
+const userStore = useUserStore()
 const suppliers = ref([])
 const tableData = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+const isWarehouseAdmin = computed(() => normalizeDeptCode(userStore.deptCode) === 'warehouse')
+const canUseSupplierFilter = computed(() => isWarehouseAdmin.value)
 
 const searchForm = reactive({
   warningType: '',
@@ -86,6 +91,9 @@ const applyRouteQuery = () => {
   const type = String(route.query.type || '').toLowerCase()
   if (type === 'zero' || type === 'low') {
     searchForm.warningType = type
+  }
+  if (!canUseSupplierFilter.value) {
+    searchForm.supplierId = null
   }
 }
 
@@ -150,7 +158,9 @@ const handleCurrentChange = (page) => {
 
 onMounted(async () => {
   applyRouteQuery()
-  await loadSuppliers()
+  if (canUseSupplierFilter.value) {
+    await loadSuppliers()
+  }
   await loadList()
 })
 </script>

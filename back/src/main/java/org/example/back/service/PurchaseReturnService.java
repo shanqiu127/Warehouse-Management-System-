@@ -12,10 +12,12 @@ import org.example.back.dto.PurchaseReturnQueryDTO;
 import org.example.back.dto.PurchaseReturnSaveDTO;
 import org.example.back.entity.BaseGoods;
 import org.example.back.entity.BaseSupplier;
+import org.example.back.entity.BizApprovalOrder;
 import org.example.back.entity.BizPurchase;
 import org.example.back.entity.BizPurchaseReturn;
 import org.example.back.mapper.BaseGoodsMapper;
 import org.example.back.mapper.BaseSupplierMapper;
+import org.example.back.mapper.BizApprovalOrderMapper;
 import org.example.back.mapper.BizPurchaseMapper;
 import org.example.back.mapper.BizPurchaseReturnMapper;
 import org.example.back.vo.PurchaseReturnVO;
@@ -28,6 +30,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,9 +53,20 @@ public class PurchaseReturnService {
     private BaseSupplierMapper baseSupplierMapper;
 
     @Autowired
+    private BizApprovalOrderMapper bizApprovalOrderMapper;
+
+    @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AuthzService authzService;
+
+    private void requirePurchaseReturnModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_PURCHASE, "仅采购部门管理员可访问进货退货模块");
+    }
+
     public PageResult<PurchaseReturnVO> page(PurchaseReturnQueryDTO queryDTO) {
+        requirePurchaseReturnModuleAccess();
         LocalDateTime startTime = queryDTO.getStartDate() == null ? null : queryDTO.getStartDate().atStartOfDay();
         LocalDateTime endTime = queryDTO.getEndDate() == null ? null : queryDTO.getEndDate().plusDays(1).atStartOfDay();
         // 构建查询条件
@@ -70,12 +84,13 @@ public class PurchaseReturnService {
                 .map(BaseGoods::getSupplierId)
                 .filter(id -> id != null)
                 .collect(Collectors.toSet()));
+        Map<Long, BizApprovalOrder> approvalMap = buildLatestApprovalMap(page.getRecords().stream().map(BizPurchaseReturn::getId).toList());
         // 将查询到的 BizPurchaseReturn 实体列表转换为 PurchaseReturnVO 列表，并关联查询商品和供应商信息以填充 VO 对象
         List<PurchaseReturnVO> records = page.getRecords().stream()
                 .map(item -> {
                     BaseGoods goods = goodsMap.get(item.getGoodsId());
                     BaseSupplier supplier = goods == null ? null : supplierMap.get(goods.getSupplierId());
-                    return toVO(item, supplier);
+                return toVO(item, supplier, approvalMap.get(item.getId()));
                 })
                 .toList();
         // 构建并返回分页结果对象，包含转换后的 VO 列表和分页信息
@@ -83,14 +98,16 @@ public class PurchaseReturnService {
     }
 
     public PurchaseReturnVO getById(Long id) {
+        requirePurchaseReturnModuleAccess();
         BizPurchaseReturn entity = requireEntity(id);
         BaseGoods goods = baseGoodsMapper.selectById(entity.getGoodsId());
         BaseSupplier supplier = goods == null ? null : baseSupplierMapper.selectById(goods.getSupplierId());
-        return toVO(entity, supplier);
+        return toVO(entity, supplier, resolveLatestApproval(entity.getId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void create(PurchaseReturnSaveDTO dto) {
+        requirePurchaseReturnModuleAccess();
         validateQuantity(dto.getQuantity());
 
         BizPurchase sourcePurchase = requireSourcePurchase(dto.getSourcePurchaseId());
@@ -124,6 +141,7 @@ public class PurchaseReturnService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        requirePurchaseReturnModuleAccess();
         BizPurchaseReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "进货退货单");
         validateDeleteWindow(entity.getOperationTime(), "进货退货单");
@@ -133,6 +151,7 @@ public class PurchaseReturnService {
 
     @Transactional(rollbackFor = Exception.class)
     public void voidDocument(Long id, DocumentVoidDTO dto) {
+        requirePurchaseReturnVoidExecutionAccess();
         BizPurchaseReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "进货退货单");
 
@@ -171,6 +190,16 @@ public class PurchaseReturnService {
             redFlushDoc.setVoidReason(reason);
             bizPurchaseReturnMapper.insert(redFlushDoc);
         }
+    }
+
+    private void requirePurchaseReturnVoidExecutionAccess() {
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_WAREHOUSE)) {
+            return;
+        }
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_PURCHASE)) {
+            throw BusinessException.validateFail("历史进货退货单作废/红冲需提交仓储审批");
+        }
+        throw BusinessException.forbidden("仅采购部门管理员可发起进货退货作废申请，且需由仓储部门审批");
     }
 
     private BizPurchaseReturn requireEntity(Long id) {
@@ -299,7 +328,26 @@ public class PurchaseReturnService {
         return baseSupplierMapper.selectList(wrapper).stream().collect(Collectors.toMap(BaseSupplier::getId, Function.identity()));
     }
 
-    private PurchaseReturnVO toVO(BizPurchaseReturn entity, BaseSupplier supplier) {
+    private Map<Long, BizApprovalOrder> buildLatestApprovalMap(List<Long> bizIds) {
+        if (bizIds.isEmpty()) {
+            return Map.of();
+        }
+        LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizApprovalOrder::getBizType, "purchase_return")
+                .in(BizApprovalOrder::getBizId, bizIds)
+                .orderByDesc(BizApprovalOrder::getId);
+        Map<Long, BizApprovalOrder> approvalMap = new LinkedHashMap<>();
+        for (BizApprovalOrder item : bizApprovalOrderMapper.selectList(wrapper)) {
+            approvalMap.putIfAbsent(item.getBizId(), item);
+        }
+        return approvalMap;
+    }
+
+    private BizApprovalOrder resolveLatestApproval(Long bizId) {
+        return buildLatestApprovalMap(List.of(bizId)).get(bizId);
+    }
+
+    private PurchaseReturnVO toVO(BizPurchaseReturn entity, BaseSupplier supplier, BizApprovalOrder approvalOrder) {
         PurchaseReturnVO vo = new PurchaseReturnVO();
         BeanUtils.copyProperties(entity, vo);
         LocalDateTime bizTime = entity.getOperationTime() == null ? entity.getCreateTime() : entity.getOperationTime();
@@ -317,6 +365,8 @@ public class PurchaseReturnService {
         vo.setSourceId(entity.getSourceId());
         vo.setVoidTime(entity.getVoidTime());
         vo.setVoidReason(entity.getVoidReason());
+        vo.setApprovalStatus(approvalOrder == null ? null : approvalOrder.getStatus());
+        vo.setApprovalRequestAction(approvalOrder == null ? null : approvalOrder.getRequestAction());
         return vo;
     }
 }

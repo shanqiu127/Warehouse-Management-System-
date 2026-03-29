@@ -9,8 +9,10 @@ import org.example.back.dto.DeptQueryDTO;
 import org.example.back.dto.DeptSaveDTO;
 import org.example.back.entity.SysDept;
 import org.example.back.entity.SysEmployee;
+import org.example.back.entity.SysUser;
 import org.example.back.mapper.SysDeptMapper;
 import org.example.back.mapper.SysEmployeeMapper;
+import org.example.back.mapper.SysUserMapper;
 import org.example.back.vo.DeptVO;
 import org.example.back.vo.OptionVO;
 import org.springframework.beans.BeanUtils;
@@ -28,8 +30,19 @@ public class DeptService {
 
     @Autowired
     private SysEmployeeMapper sysEmployeeMapper;
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private AuthzService authzService;
+
+    private void requireDeptModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_HR, "仅人事部门管理员可访问部门管理");
+    }
     // 部门分页查询
     public PageResult<DeptVO> page(DeptQueryDTO queryDTO) {
+        requireDeptModuleAccess();
         LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getDeptName()), SysDept::getDeptName, queryDTO.getDeptName())
                 .orderByDesc(SysDept::getId);
@@ -40,6 +53,14 @@ public class DeptService {
     }
     // 部门选项列表
     public List<OptionVO> options() {
+        if (authzService.isAdmin() && !authzService.isDeptAdmin(AuthzService.DEPT_HR)) {
+            SysDept currentDept = requireDept(authzService.currentDeptId());
+            return List.of(new OptionVO(currentDept.getId(), currentDept.getDeptName()));
+        }
+        return publicOptions();
+    }
+
+    public List<OptionVO> publicOptions() {
         LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<>();
         wrapper.orderByAsc(SysDept::getDeptName);
         return sysDeptMapper.selectList(wrapper).stream()
@@ -48,10 +69,13 @@ public class DeptService {
     }
 
     public DeptVO getById(Long id) {
-        return toVO(requireDept(id));
+        requireDeptModuleAccess();
+        SysDept dept = requireDept(id);
+        return toVO(dept);
     }
 
     public void create(DeptSaveDTO dto) {
+        authzService.requireSuperAdmin("仅超级管理员可新增部门");
         SysDept dept = new SysDept();
         BeanUtils.copyProperties(dto, dept);
         dept.setDeptCode(CodeGenerator.deptCode());
@@ -60,6 +84,7 @@ public class DeptService {
     }
 
     public void update(Long id, DeptSaveDTO dto) {
+        requireDeptModuleAccess();
         SysDept dept = requireDept(id);
         checkDeptNameUnique(dto.getDeptName(), id);
         dept.setDeptName(dto.getDeptName());
@@ -70,11 +95,17 @@ public class DeptService {
     }
 
     public void delete(Long id) {
+        authzService.requireSuperAdmin("仅超级管理员可删除部门");
         requireDept(id);
         LambdaQueryWrapper<SysEmployee> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysEmployee::getDeptId, id);
         if (sysEmployeeMapper.selectCount(wrapper) > 0) {
             throw BusinessException.validateFail("该部门下仍有关联员工，无法删除");
+        }
+        LambdaQueryWrapper<SysUser> userWrapper = new LambdaQueryWrapper<>();
+        userWrapper.eq(SysUser::getDeptId, id);
+        if (sysUserMapper.selectCount(userWrapper) > 0) {
+            throw BusinessException.validateFail("该部门下仍有关联用户账号，无法删除");
         }
         sysDeptMapper.deleteById(id);
     }

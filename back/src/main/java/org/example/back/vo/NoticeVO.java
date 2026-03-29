@@ -13,6 +13,12 @@ public class NoticeVO {
 
     private String content;
 
+    private String targetRole;
+
+    private Long targetDeptId;
+
+    private String targetDeptName;
+
     private String publisher;
 
     private String author;

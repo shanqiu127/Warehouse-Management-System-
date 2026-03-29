@@ -1,10 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router"
 import { ElMessage } from "element-plus"
-import { canAccessRoles, getRole, getToken, isSuperAdmin } from "@/utils/auth"
+import { canAccessRoles, getDeptCode, getRole, getToken, hasDeptAccess, isSuperAdmin } from "@/utils/auth"
 
 const SUPERADMIN_ALLOWED_PATHS = new Set([
   '/',
   '/home',
+  '/system/notice',
   '/system/super-admin',
   '/system/user',
   '/system/security-ip-policy',
@@ -41,82 +42,79 @@ const router = createRouter({
           path: "base/supplier",
           name: "BaseSupplier",
           component: () => import("../views/base/SupplierView.vue"),
-          meta: { roles: ['employee'] }
+          meta: { roles: ['admin'], deptCodes: ['warehouse'] }
         },
         {
           path: "base/goods",
           name: "BaseGoods",
           component: () => import("../views/base/GoodsView.vue"),
-          meta: { roles: ['employee'] }
+          meta: { roles: ['admin'], deptCodes: ['warehouse'] }
         },
-        // 业务部分页面
         {
           path: "business/purchase",
           name: "BusinessPurchase",
           component: () => import("../views/business/PurchaseView.vue"),
-          meta: { roles: ['employee'] }
+          meta: { roles: ['admin'], deptCodes: ['purchase'] }
         },
         {
           path: "business/purchase-return",
           name: "BusinessPurchaseReturn",
           component: () => import("../views/business/PurchaseReturnView.vue"),
-          meta: { roles: ['employee'] }
+          meta: { roles: ['admin'], deptCodes: ['purchase'] }
         },
         {
           path: "business/sales",
           name: "BusinessSales",
           component: () => import("../views/business/SalesView.vue"),
-          meta: { roles: ['employee'] }
+          meta: { roles: ['admin'], deptCodes: ['sales'] }
         },
         {
           path: "business/sales-return",
           name: "BusinessSalesReturn",
           component: () => import("../views/business/SalesReturnView.vue"),
-          meta: { roles: ['employee'] }
+          meta: { roles: ['admin'], deptCodes: ['sales'] }
         },
-        // 统计图表页面
         {
           path: "business/sales-chart",
           name: "BusinessSalesChart",
           component: () => import("../views/business/SalesChartView.vue"),
-          meta: { roles: ['admin', 'superadmin'] } 
+          meta: { roles: ['admin'], deptCodes: ['finance'] }
         },
         {
           path: "business/stock-warning",
           name: "BusinessStockWarning",
           component: () => import("../views/business/StockWarningView.vue"),
-          meta: { roles: ['admin', 'employee'] }
+          meta: { roles: ['admin'], deptCodes: ['warehouse', 'purchase', 'sales'] }
         },
-        // 以下为动态权限测试页面
         {
           path: "system/notice",
           name: "SystemNotice",
           component: () => import("../views/system/NoticeView.vue"),
-          meta: { roles: ['admin', 'superadmin'] } 
+          meta: { roles: ['admin', 'superadmin'] }
         },
         {
           path: "system/user",
           name: "SystemUser",
           component: () => import("../views/system/UserView.vue"),
-          meta: { roles: ['superadmin'] }
+          meta: { roles: ['admin', 'superadmin'] }
         },
         {
           path: "system/dept",
           name: "SystemDept",
           component: () => import("../views/system/DeptView.vue"),
-          meta: { roles: ['admin', 'superadmin'] } 
+          meta: { roles: ['admin'], deptCodes: ['hr'] }
         },
         {
           path: "system/employee",
           name: "SystemEmployee",
           component: () => import("../views/system/EmployeeView.vue"),
-          meta: { roles: ['admin', 'superadmin'] } 
+          meta: { roles: ['admin'], deptCodes: ['hr'] }
         },
         {
           path: "system/void-approval",
           name: "SystemVoidApproval",
           component: () => import("../views/system/VoidApprovalView.vue"),
-          meta: { roles: ['admin'] }
+          meta: { roles: ['admin'], deptCodes: ['warehouse'] }
         },
         {
           path: "system/super-admin",
@@ -157,23 +155,28 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const token = getToken()
   const role = getRole()
+  const deptCode = getDeptCode()
 
   if (to.path !== '/login' && to.path !== '/register') {
     if (!token) {
-      // 1. 未登录拦截至登录页
       return next('/login')
     } else {
-      // 超级管理员仅保留首页和超管中心能力入口
       if (isSuperAdmin(role) && !SUPERADMIN_ALLOWED_PATHS.has(to.path)) {
         ElMessage.warning('超级管理员仅开放首页与超管中心模块')
         return next('/home')
       }
 
-      // 2. 鉴权：页面是否有角色限制
       if (to.meta && to.meta.roles) {
         const allowRoles = to.meta.roles
         if (!canAccessRoles(role, allowRoles)) {
           ElMessage.error('无权限访问该页面')
+          return next('/403')
+        }
+      }
+
+      if (to.meta && Array.isArray(to.meta.deptCodes) && to.meta.deptCodes.length > 0) {
+        if (!hasDeptAccess(deptCode, to.meta.deptCodes, role)) {
+          ElMessage.error('当前部门无权限访问该页面')
           return next('/403')
         }
       }

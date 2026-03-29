@@ -6,9 +6,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.example.back.common.exception.BusinessException;
 import org.example.back.common.result.PageResult;
+import org.example.back.dto.LoginResponse;
 import org.example.back.dto.UserQueryDTO;
 import org.example.back.dto.UserSaveDTO;
+import org.example.back.entity.SysDept;
 import org.example.back.entity.SysUser;
+import org.example.back.mapper.SysDeptMapper;
 import org.example.back.mapper.SysUserMapper;
 import org.example.back.vo.UserVO;
 import org.springframework.beans.BeanUtils;
@@ -17,6 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class UserManageService {
@@ -29,41 +36,65 @@ public class UserManageService {
     @Autowired
     private SysUserMapper sysUserMapper;
 
+    @Autowired
+    private SysDeptMapper sysDeptMapper;
+
+    @Autowired
+    private AuthzService authzService;
+
     public PageResult<UserVO> page(UserQueryDTO queryDTO) {
+        LoginResponse.UserInfoVO operator = authzService.currentUser();
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getUsername()), SysUser::getUsername, queryDTO.getUsername())
                 .eq(StringUtils.hasText(queryDTO.getRole()), SysUser::getRole, queryDTO.getRole())
+                .eq(queryDTO.getDeptId() != null, SysUser::getDeptId, queryDTO.getDeptId())
                 .eq(queryDTO.getStatus() != null, SysUser::getStatus, queryDTO.getStatus())
                 .orderByDesc(SysUser::getId);
 
+        if (authzService.isAdmin()) {
+            wrapper.eq(SysUser::getRole, ROLE_EMPLOYEE)
+                    .eq(SysUser::getDeptId, operator.getDeptId());
+        }
+
         Page<SysUser> page = sysUserMapper.selectPage(new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize()), wrapper);
-        List<UserVO> records = page.getRecords().stream().map(this::toVO).toList();
+        Map<Long, SysDept> deptMap = buildDeptMap(page.getRecords().stream()
+                .map(SysUser::getDeptId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet()));
+        List<UserVO> records = page.getRecords().stream().map(item -> toVO(item, deptMap.get(item.getDeptId()))).toList();
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
     public UserVO getById(Long id) {
-        return toVO(requireUser(id));
+        SysUser user = requireManageableUser(id);
+        return toVO(user, user.getDeptId() == null ? null : sysDeptMapper.selectById(user.getDeptId()));
     }
 
     public void create(UserSaveDTO dto) {
+        LoginResponse.UserInfoVO operator = authzService.currentUser();
         validateRoleForManage(dto.getRole());
         rejectSuperadminCreate(dto.getRole());
+        Long deptId = validateAndResolveDeptId(dto.getRole(), dto.getDeptId(), operator);
         checkUsernameUnique(dto.getUsername(), null);
         SysUser user = new SysUser();
         BeanUtils.copyProperties(dto, user);
+        user.setDeptId(deptId);
         user.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         user.setPassword(BCrypt.hashpw(DEFAULT_PASSWORD));
         sysUserMapper.insert(user);
     }
 
     public void update(Long id, UserSaveDTO dto) {
-        SysUser user = requireUser(id);
+        LoginResponse.UserInfoVO operator = authzService.currentUser();
+        SysUser user = requireManageableUser(id);
         validateRoleForManage(dto.getRole());
         validateSuperadminRoleChange(user.getRole(), dto.getRole());
+        Long deptId = validateAndResolveDeptId(dto.getRole(), dto.getDeptId(), operator);
         checkUsernameUnique(dto.getUsername(), id);
         user.setUsername(dto.getUsername());
         user.setRealName(dto.getRealName());
         user.setRole(dto.getRole());
+        user.setDeptId(deptId);
         user.setStatus(dto.getStatus() == null ? user.getStatus() : dto.getStatus());
         user.setPhone(dto.getPhone());
         user.setEmail(dto.getEmail());
@@ -74,7 +105,7 @@ public class UserManageService {
         if (status == null || (status != 0 && status != 1)) {
             throw BusinessException.validateFail("用户状态只能为 0 或 1");
         }
-        SysUser user = requireUser(id);
+        SysUser user = requireManageableUser(id);
         if (ROLE_SUPERADMIN.equals(user.getRole())) {
             throw BusinessException.validateFail("超级管理员状态不允许修改");
         }
@@ -83,12 +114,9 @@ public class UserManageService {
     }
 
     public void delete(Long id) {
-        SysUser user = requireUser(id);
+        SysUser user = requireManageableUser(id);
         if (ROLE_SUPERADMIN.equals(user.getRole())) {
             throw BusinessException.validateFail("超级管理员账号不允许删除");
-        }
-        if ("admin".equals(user.getUsername())) {
-            throw BusinessException.validateFail("默认管理员账号不允许删除");
         }
         sysUserMapper.deleteById(id);
     }
@@ -99,7 +127,7 @@ public class UserManageService {
         }
 
         SysUser operator = requireCurrentUser();
-        SysUser targetUser = requireUser(targetUserId);
+        SysUser targetUser = requireManageableUser(targetUserId);
 
         String operatorRole = operator.getRole();
         String targetRole = targetUser.getRole();
@@ -109,9 +137,7 @@ public class UserManageService {
                 throw BusinessException.validateFail("超级管理员账号不允许通过该接口修改密码");
             }
         } else if (ROLE_ADMIN.equals(operatorRole)) {
-            if (!ROLE_EMPLOYEE.equals(targetRole)) {
-                throw BusinessException.forbidden("普通管理员仅可重置普通用户密码");
-            }
+            assertAdminCanManageUser(targetUser);
         } else {
             throw BusinessException.forbidden("当前角色无权重置密码");
         }
@@ -129,10 +155,37 @@ public class UserManageService {
         return requireUser(userId);
     }
 
+    private SysUser requireManageableUser(Long id) {
+        SysUser user = requireUser(id);
+        if (authzService.isSuperAdmin()) {
+            return user;
+        }
+        assertAdminCanManageUser(user);
+        return user;
+    }
+
     private void validateRoleForManage(String role) {
         if (!ROLE_SUPERADMIN.equals(role) && !ROLE_ADMIN.equals(role) && !ROLE_EMPLOYEE.equals(role)) {
             throw BusinessException.validateFail("用户角色仅支持 superadmin、admin 或 employee");
         }
+    }
+
+    private Long validateAndResolveDeptId(String targetRole, Long deptId, LoginResponse.UserInfoVO operator) {
+        String normalizedRole = authzService.normalizeRole(targetRole);
+        if (ROLE_SUPERADMIN.equals(normalizedRole)) {
+            return null;
+        }
+
+        SysDept dept = authzService.requireDept(deptId);
+        if (authzService.isAdmin()) {
+            if (!ROLE_EMPLOYEE.equals(normalizedRole)) {
+                throw BusinessException.forbidden("部门管理员仅可创建或维护本部门员工账号");
+            }
+            if (operator.getDeptId() == null || !operator.getDeptId().equals(dept.getId())) {
+                throw BusinessException.forbidden("部门管理员仅可操作本部门员工账号");
+            }
+        }
+        return dept.getId();
     }
 
     private void rejectSuperadminCreate(String role) {
@@ -170,12 +223,31 @@ public class UserManageService {
         return user;
     }
 
-    private UserVO toVO(SysUser user) {
+    private void assertAdminCanManageUser(SysUser user) {
+        if (!ROLE_EMPLOYEE.equals(authzService.normalizeRole(user.getRole()))) {
+            throw BusinessException.forbidden("部门管理员仅可操作本部门员工账号");
+        }
+        authzService.requireCurrentDept(user.getDeptId(), "部门管理员仅可操作本部门员工账号");
+    }
+
+    private Map<Long, SysDept> buildDeptMap(Set<Long> deptIds) {
+        if (deptIds.isEmpty()) {
+            return Map.of();
+        }
+        LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(SysDept::getId, deptIds);
+        return sysDeptMapper.selectList(wrapper).stream().collect(Collectors.toMap(SysDept::getId, Function.identity()));
+    }
+
+    private UserVO toVO(SysUser user, SysDept dept) {
         UserVO vo = new UserVO();
         vo.setId(user.getId());
         vo.setUsername(user.getUsername());
         vo.setRealName(user.getRealName());
         vo.setRole(user.getRole());
+        vo.setDeptId(user.getDeptId());
+        vo.setDeptCode(dept == null ? null : dept.getDeptCode());
+        vo.setDeptName(dept == null ? null : dept.getDeptName());
         vo.setStatus(user.getStatus() != null && user.getStatus() == 1);
         vo.setPhone(user.getPhone());
         vo.setEmail(user.getEmail());

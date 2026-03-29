@@ -29,7 +29,15 @@ public class SupplierService {
     @Autowired
     private BaseGoodsMapper baseGoodsMapper;
 
+    @Autowired
+    private AuthzService authzService;
+
+    private void requireSupplierModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_WAREHOUSE, "仅仓储部门管理员可访问供应商资料");
+    }
+
     public PageResult<SupplierVO> page(SupplierQueryDTO queryDTO) {
+        requireSupplierModuleAccess();
         LambdaQueryWrapper<BaseSupplier> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getSupplierName()), BaseSupplier::getSupplierName, queryDTO.getSupplierName())
                 .and(StringUtils.hasText(queryDTO.getContact()), w -> w.like(BaseSupplier::getContactPerson, queryDTO.getContact()))
@@ -42,6 +50,7 @@ public class SupplierService {
     }
 
     public List<OptionVO> options() {
+        requireSupplierModuleAccess();
         LambdaQueryWrapper<BaseSupplier> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BaseSupplier::getStatus, 1).orderByAsc(BaseSupplier::getSupplierName);
         return baseSupplierMapper.selectList(wrapper).stream()
@@ -50,10 +59,12 @@ public class SupplierService {
     }
 
     public SupplierVO getById(Long id) {
+        requireSupplierModuleAccess();
         return toVO(requireSupplier(id));
     }
 
     public void create(SupplierSaveDTO dto) {
+        requireSupplierModuleAccess();
         checkSupplierNameUnique(dto.getSupplierName(), null);
         BaseSupplier supplier = new BaseSupplier();
         BeanUtils.copyProperties(dto, supplier);
@@ -63,6 +74,7 @@ public class SupplierService {
     }
 
     public void update(Long id, SupplierSaveDTO dto) {
+        requireSupplierModuleAccess();
         BaseSupplier supplier = requireSupplier(id);
         checkSupplierNameUnique(dto.getSupplierName(), id);
         supplier.setSupplierName(dto.getSupplierName());
@@ -75,6 +87,7 @@ public class SupplierService {
     }
 
     public void delete(Long id) {
+        requireSupplierModuleAccess();
         requireSupplier(id);
         LambdaQueryWrapper<BaseGoods> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BaseGoods::getSupplierId, id);

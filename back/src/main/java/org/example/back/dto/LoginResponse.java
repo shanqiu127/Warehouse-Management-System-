@@ -52,6 +52,21 @@ public class LoginResponse {
         private String role;
 
         /**
+         * 所属部门ID，超级管理员允许为空
+         */
+        private Long deptId;
+
+        /**
+         * 所属部门编码
+         */
+        private String deptCode;
+
+        /**
+         * 所属部门名称
+         */
+        private String deptName;
+
+        /**
          * 本次登录时间
          */
         private LocalDateTime currentLoginTime;

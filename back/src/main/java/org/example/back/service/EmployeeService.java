@@ -31,8 +31,16 @@ public class EmployeeService {
 
     @Autowired
     private SysDeptMapper sysDeptMapper;
+
+    @Autowired
+    private AuthzService authzService;
+
+    private void requireEmployeeModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_HR, "仅人事部门管理员可访问员工档案");
+    }
     // 员工分页查询
     public PageResult<EmployeeVO> page(EmployeeQueryDTO queryDTO) {
+        requireEmployeeModuleAccess();
         LambdaQueryWrapper<SysEmployee> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getEmpName()), SysEmployee::getEmpName, queryDTO.getEmpName())
                 .eq(queryDTO.getDeptId() != null, SysEmployee::getDeptId, queryDTO.getDeptId())
@@ -46,12 +54,14 @@ public class EmployeeService {
     }
 
     public EmployeeVO getById(Long id) {
+        requireEmployeeModuleAccess();
         SysEmployee employee = requireEmployee(id);
         SysDept dept = sysDeptMapper.selectById(employee.getDeptId());
         return toVO(employee, dept);
     }
 
     public void create(EmployeeSaveDTO dto) {
+        requireEmployeeModuleAccess();
         requireDept(dto.getDeptId());
         SysEmployee employee = new SysEmployee();
         BeanUtils.copyProperties(dto, employee);
@@ -61,6 +71,7 @@ public class EmployeeService {
     }
 
     public void update(Long id, EmployeeSaveDTO dto) {
+        requireEmployeeModuleAccess();
         requireDept(dto.getDeptId());
         SysEmployee employee = requireEmployee(id);
         employee.setEmpName(dto.getEmpName());
@@ -73,6 +84,7 @@ public class EmployeeService {
     }
 
     public void delete(Long id) {
+        requireEmployeeModuleAccess();
         requireEmployee(id);
         sysEmployeeMapper.deleteById(id);
     }

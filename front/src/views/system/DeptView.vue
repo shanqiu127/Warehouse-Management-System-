@@ -14,13 +14,12 @@
     <el-table :data="tableData" border style="width: 100%" row-key="id" v-loading="loading">
       <el-table-column type="index" label="序号" width="60" />
       <el-table-column prop="deptName" label="部门名称" />
-      <el-table-column prop="manager" label="负责人" />
+      <el-table-column prop="manager" label="负责人（可多位）" />
       <el-table-column prop="contactPhone" label="联系电话" />
       <el-table-column prop="createTime" label="创建时间" />
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="scope">
           <el-button size="small" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -43,7 +42,7 @@
           <el-input v-model="form.deptName"></el-input>
         </el-form-item>
         <el-form-item label="负责人">
-          <el-input v-model="form.manager"></el-input>
+          <el-input v-model="form.manager" placeholder="支持填写多位负责人，使用逗号或顿号分隔"></el-input>
         </el-form-item>
         <el-form-item label="联系电话">
           <el-input v-model="form.contactPhone"></el-input>

@@ -1,37 +1,39 @@
 <template>
   <el-card>
-    <el-form :inline="true" :model="searchForm" class="search-form">
+    <el-form :inline="true" :model="searchForm">
       <el-form-item label="公告标题">
         <el-input v-model="searchForm.title" placeholder="请输入公告标题" clearable />
       </el-form-item>
-      <el-form-item label="状态">
-        <el-select v-model="searchForm.status" placeholder="全部" clearable style="width: 120px;">
-          <el-option label="已发布" :value="1" />
-          <el-option label="草稿" :value="0" />
+      <el-form-item label="受众角色">
+        <el-select v-model="searchForm.targetRole" clearable placeholder="全部" style="width: 140px;">
+          <el-option v-for="item in targetRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="目标部门" v-if="isSuperAdminUser">
+        <el-select v-model="searchForm.targetDeptId" clearable placeholder="全部" style="width: 160px;">
+          <el-option v-for="dept in deptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
         </el-select>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="handleSearch">查询</el-button>
         <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd" v-permission="['admin']">新增公告</el-button>
+        <el-button type="success" @click="handleAdd">新增公告</el-button>
       </el-form-item>
     </el-form>
 
-    <el-table :data="tableData" border style="width: 100%" v-loading="loading">
+    <el-table v-loading="loading" :data="tableData" border style="width: 100%">
       <el-table-column type="index" label="序号" width="60" />
-      <el-table-column prop="title" label="公告标题" />
-      <el-table-column prop="status" label="状态" width="100">
-        <template #default="scope">
-          <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ scope.row.status === 1 ? '已发布' : '草稿' }}</el-tag>
-        </template>
+      <el-table-column prop="title" label="公告标题" min-width="180" />
+      <el-table-column label="受众" min-width="160">
+        <template #default="scope">{{ audienceLabel(scope.row) }}</template>
       </el-table-column>
       <el-table-column prop="date" label="发布时间" width="180" />
       <el-table-column prop="author" label="发布人" width="120" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="scope">
           <el-button size="small" @click="handleView(scope.row)">查看</el-button>
-          <el-button size="small" type="primary" @click="handleEdit(scope.row)" v-permission="['admin']">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)" v-permission="['admin']">删除</el-button>
+          <el-button size="small" type="primary" :disabled="!canManage(scope.row)" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-button size="small" type="danger" :disabled="!canManage(scope.row)" @click="handleDelete(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -48,13 +50,28 @@
       />
     </div>
 
-    <el-dialog :title="dialogTitle" v-model="dialogVisible" width="50%">
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px" :disabled="isView">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="50%">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" :disabled="isView">
         <el-form-item label="公告标题" prop="title">
-          <el-input v-model="form.title" :disabled="isView" placeholder="请输入标题"></el-input>
+          <el-input v-model="form.title" :disabled="isView" placeholder="请输入标题" />
         </el-form-item>
         <el-form-item label="公告内容" prop="content">
-          <el-input type="textarea" v-model="form.content" :disabled="isView" :rows="4" placeholder="请输入正文"></el-input>
+          <el-input v-model="form.content" type="textarea" :rows="5" :disabled="isView" placeholder="请输入正文" />
+        </el-form-item>
+        <el-form-item label="受众角色" prop="targetRole">
+          <el-select v-model="form.targetRole" style="width: 100%;" :disabled="isView || !isSuperAdminUser">
+            <el-option v-for="item in formTargetRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="showTargetDeptField" label="目标部门">
+          <el-select
+            v-model="form.targetDeptId"
+            style="width: 100%;"
+            clearable
+            :disabled="isView || !isSuperAdminUser || form.targetRole === 'all'"
+          >
+            <el-option v-for="dept in deptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
+          </el-select>
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status" :disabled="isView">
@@ -74,27 +91,32 @@
         </el-form-item>
       </el-form>
       <template #footer v-if="!isView">
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSave">确认</el-button>
-        </span>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSave">确认</el-button>
       </template>
     </el-dialog>
   </el-card>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/stores/user'
+import { isSuperAdmin } from '@/utils/auth'
 import {
   createNoticeAPI,
   deleteNoticeAPI,
+  getDeptOptionsAPI,
   getNoticeDetailAPI,
   getNoticePageAPI,
   updateNoticeAPI
 } from '@/api/system'
 
-const searchForm = reactive({ title: '', status: null })
+const userStore = useUserStore()
+const isSuperAdminUser = computed(() => isSuperAdmin(userStore.role))
+
+const deptOptions = ref([])
+const searchForm = reactive({ title: '', targetRole: '', targetDeptId: null })
 const tableData = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
@@ -105,17 +127,78 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const isView = ref(false)
 const formRef = ref(null)
-const form = reactive({ id: null, title: '', content: '', status: 1, publishDate: '' })
+const form = reactive({
+  id: null,
+  title: '',
+  content: '',
+  targetRole: 'all',
+  targetDeptId: null,
+  status: 1,
+  publishDate: ''
+})
+
+const targetRoleOptions = computed(() => (
+  isSuperAdminUser.value
+    ? [
+        { label: '管理员', value: 'admin' },
+        { label: '全员', value: 'all' }
+      ]
+    : [{ label: '本部门员工', value: 'employee' }]
+))
+
+const formTargetRoleOptions = computed(() => (
+  isSuperAdminUser.value
+    ? [
+        { label: '管理员', value: 'admin' },
+        { label: '全员', value: 'all' }
+      ]
+    : [{ label: '本部门员工', value: 'employee' }]
+))
+
+const showTargetDeptField = computed(() => isSuperAdminUser.value || form.targetRole === 'employee')
 
 const rules = {
   title: [{ required: true, message: '请输入公告标题', trigger: 'blur' }],
   content: [{ required: true, message: '请输入公告内容', trigger: 'blur' }],
+  targetRole: [{ required: true, message: '请选择受众角色', trigger: 'change' }],
   status: [{ required: true, message: '请选择公告状态', trigger: 'change' }]
 }
 
-const normalizeDateTime = (val) => {
-  if (!val) return ''
-  return String(val).replace('T', ' ')
+const normalizeDateTime = (value) => {
+  if (!value) return ''
+  return String(value).replace('T', ' ').substring(0, 19)
+}
+
+const audienceLabel = (row = {}) => {
+  if (row.targetRole === 'all') return '全员'
+  if (row.targetRole === 'admin') return row.targetDeptName ? `${row.targetDeptName} 管理员` : '管理员'
+  if (row.targetRole === 'employee') return row.targetDeptName ? `${row.targetDeptName} 员工` : '本部门员工'
+  return '--'
+}
+
+const canManage = (row) => isSuperAdminUser.value || (row.targetRole === 'employee' && row.targetDeptId === userStore.deptId)
+
+const resetForm = () => {
+  form.id = null
+  form.title = ''
+  form.content = ''
+  form.targetRole = isSuperAdminUser.value ? 'all' : 'employee'
+  form.targetDeptId = isSuperAdminUser.value ? null : userStore.deptId
+  form.status = 1
+  form.publishDate = ''
+}
+
+const loadDeptOptions = async () => {
+  const res = await getDeptOptionsAPI()
+  if (res.code !== 200) {
+    throw new Error(res.msg || '部门列表加载失败')
+  }
+  deptOptions.value = res.data || []
+  if (!isSuperAdminUser.value) {
+    searchForm.targetDeptId = userStore.deptId
+    form.targetRole = 'employee'
+    form.targetDeptId = userStore.deptId
+  }
 }
 
 const loadList = async () => {
@@ -125,7 +208,8 @@ const loadList = async () => {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
       title: searchForm.title || undefined,
-      status: searchForm.status === null ? undefined : searchForm.status
+      targetRole: searchForm.targetRole || undefined,
+      targetDeptId: searchForm.targetDeptId || undefined
     }
     const res = await getNoticePageAPI(params)
     if (res.code !== 200) {
@@ -151,28 +235,21 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchForm.title = ''
-  searchForm.status = null
+  searchForm.targetRole = ''
+  searchForm.targetDeptId = isSuperAdminUser.value ? null : userStore.deptId
   currentPage.value = 1
   loadList()
 }
 
-const handleSizeChange = (val) => {
-  pageSize.value = val
+const handleSizeChange = (value) => {
+  pageSize.value = value
   currentPage.value = 1
   loadList()
 }
 
-const handleCurrentChange = (val) => {
-  currentPage.value = val
+const handleCurrentChange = (value) => {
+  currentPage.value = value
   loadList()
-}
-
-const resetForm = () => {
-  form.id = null
-  form.title = ''
-  form.content = ''
-  form.status = 1
-  form.publishDate = ''
 }
 
 const handleAdd = () => {
@@ -195,6 +272,8 @@ const openByDetail = async (row, viewMode) => {
     id: detail.id,
     title: detail.title || '',
     content: detail.content || '',
+    targetRole: detail.targetRole || (isSuperAdminUser.value ? 'all' : 'employee'),
+    targetDeptId: detail.targetDeptId || (isSuperAdminUser.value ? null : userStore.deptId),
     status: detail.status ?? 1,
     publishDate: normalizeDateTime(detail.publishTime || detail.date)
   })
@@ -211,6 +290,10 @@ const handleView = async (row) => {
 }
 
 const handleEdit = async (row) => {
+  if (!canManage(row)) {
+    ElMessage.warning('当前账号无权编辑该公告')
+    return
+  }
   try {
     await openByDetail(row, false)
   } catch (error) {
@@ -219,7 +302,15 @@ const handleEdit = async (row) => {
 }
 
 const handleDelete = (row) => {
-  ElMessageBox.confirm('确认删除该公告吗?', '警告', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+  if (!canManage(row)) {
+    ElMessage.warning('当前账号无权删除该公告')
+    return
+  }
+  ElMessageBox.confirm('确认删除该公告吗?', '警告', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
     .then(async () => {
       const res = await deleteNoticeAPI(row.id)
       if (res.code !== 200) {
@@ -238,10 +329,11 @@ const handleSave = () => {
       const payload = {
         title: form.title,
         content: form.content,
+        targetRole: isSuperAdminUser.value ? form.targetRole : 'employee',
+        targetDeptId: isSuperAdminUser.value ? (form.targetRole === 'all' ? null : form.targetDeptId) : userStore.deptId,
         status: form.status,
-        publishTime: form.publishDate ? `${String(form.publishDate).replace(' ', 'T')}` : undefined
+        publishTime: form.publishDate ? String(form.publishDate).replace(' ', 'T') : undefined
       }
-
       const res = form.id ? await updateNoticeAPI(form.id, payload) : await createNoticeAPI(payload)
       if (res.code !== 200) {
         throw new Error(res.msg || '保存失败')
@@ -255,7 +347,13 @@ const handleSave = () => {
   })
 }
 
-onMounted(() => {
-  loadList()
+onMounted(async () => {
+  try {
+    resetForm()
+    await loadDeptOptions()
+    await loadList()
+  } catch (error) {
+    ElMessage.error(error.message || '初始化失败')
+  }
 })
 </script>

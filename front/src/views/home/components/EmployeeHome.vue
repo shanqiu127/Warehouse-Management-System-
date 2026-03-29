@@ -1,81 +1,56 @@
 <template>
-  <div class="admin-dashboard">
-    <div class="glass-orb shape-1" style="background: #dcfce7;"></div>
-    <div class="glass-orb shape-2" style="background: #fef9c3;"></div>
-    
-    <div class="content-wrapper">
-      <header class="admin-header">
-        <div class="header-text">
-          <span class="eyebrow">WORKSPACE / EMPLOYEE</span>
-          <h1>Welcome back, <br/> <span class="highlight-emp">{{ summary.realName || summary.username || 'Employee' }}</span></h1>
+  <div class="employee-dashboard">
+    <div class="dashboard-shell">
+      <header class="hero-card">
+        <div>
+          <p class="eyebrow">DEPARTMENT EMPLOYEE</p>
+          <h1>{{ summary.realName || summary.username || '部门员工' }}</h1>
+          <p class="hero-desc">{{ summary.deptName || '当前部门' }} · 今日工作看板</p>
         </div>
-        <div class="header-date">
-          <div class="glass-chip">
-            <span class="status-dot"></span>
-            {{ nowDateText }}
-          </div>
+        <div class="hero-meta">
+          <span>{{ formatTime(summary.currentLoginTime) }}</span>
         </div>
       </header>
 
-      <section class="metrics-grid">
-        <div class="metric-glass card-hover">
-          <div class="metric-content">
-            <p>Current Session</p>
-            <h3>{{ formatTime(summary.currentLoginTime) }}</h3>
-          </div>
-        </div>
-        <div class="metric-glass card-hover">
-          <div class="metric-content">
-            <p>Previous Login</p>
-            <h3>{{ formatTime(summary.lastLoginTime) }}</h3>
-          </div>
-        </div>
-
-        <div class="metric-glass card-hover" @click="goStockWarning('low')" style="cursor: pointer;">
-          <div class="metric-content">
-            <p>Low Stock Alerts</p>
-            <h3>{{ summary.lowStockCount ?? 0 }}</h3>
-          </div>
-        </div>
-
-        <div class="metric-glass card-hover" @click="goStockWarning('zero')" style="cursor: pointer;">
-          <div class="metric-content">
-            <p>Zero Stock Alerts</p>
-            <h3>{{ summary.zeroStockCount ?? 0 }}</h3>
-          </div>
-        </div>
+      <section class="metric-grid">
+        <article class="metric-card">
+          <span class="metric-label">当前部门</span>
+          <strong>{{ summary.deptName || '未分配部门' }}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">公告数量</span>
+          <strong>{{ noticeList.length }}</strong>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">上次登录</span>
+          <strong>{{ formatTime(summary.lastLoginTime) }}</strong>
+        </article>
       </section>
 
-      <div class="layout-grid-full">
-        <section class="system-status card-glass" v-loading="noticeLoading">
-          <div class="section-header">
-            <h2>System Announcements</h2>
-            <div class="notice-count" v-if="noticeList.length">{{ noticeList.length }} New</div>
-          </div>
-          
-          <div class="notice-list">
-            <div class="notice-item" v-for="(item, index) in noticeList" :key="index" @click="openNotice(item)">
-              <div class="notice-info">
-                <h3>{{ item.title }}</h3>
-                <p>Published by {{ item.author || 'System' }}</p>
-              </div>
-              <div class="notice-date">{{ formatTime(item.date || item.publishTime).split(' ')[0] }}</div>
+      <section class="panel-card" v-loading="noticeLoading">
+        <div class="panel-head">
+          <h2>最新公告</h2>
+          <span>按当前账号可见范围过滤</span>
+        </div>
+        <div v-if="noticeList.length" class="notice-list">
+          <button v-for="item in noticeList" :key="item.id" type="button" class="notice-item" @click="openNotice(item)">
+            <div>
+              <div class="notice-title">{{ item.title }}</div>
+              <div class="notice-meta">{{ item.author || item.publisher || '系统发布' }}</div>
             </div>
-            <div class="empty-state" v-if="!noticeLoading && noticeList.length === 0">
-              No new announcements at this time.
-            </div>
-          </div>
-        </section>
-      </div>
+            <span class="notice-date">{{ formatTime(item.date || item.publishTime) }}</span>
+          </button>
+        </div>
+        <div v-else class="empty-state">暂无可见公告</div>
+      </section>
 
-      <!-- Element Plus 原生弹窗 (沿用原有交互逻辑) -->
-      <el-dialog v-model="noticeDialogVisible" title="System Announcement" width="620px">
+      <el-dialog v-model="noticeDialogVisible" title="公告详情" width="620px">
         <el-descriptions :column="1" border>
           <el-descriptions-item label="标题">{{ noticeDetail.title || '-' }}</el-descriptions-item>
           <el-descriptions-item label="发布时间">{{ noticeDetail.date || '-' }}</el-descriptions-item>
           <el-descriptions-item label="发布人">{{ noticeDetail.author || '-' }}</el-descriptions-item>
           <el-descriptions-item label="正文">
-            <p style="white-space: pre-wrap; line-height: 1.6;">{{ noticeDetail.content || '-' }}</p>
+            <p class="notice-content">{{ noticeDetail.content || '-' }}</p>
           </el-descriptions-item>
         </el-descriptions>
       </el-dialog>
@@ -84,28 +59,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
 import { getNoticeDetailAPI, getNoticePageAPI } from '@/api/system'
 
-const router = useRouter()
 const summary = ref({
   username: '',
   realName: '',
+  deptName: '',
   currentLoginTime: null,
-  lastLoginTime: null,
-  lowStockCount: 0,
-  zeroStockCount: 0
+  lastLoginTime: null
 })
 const noticeList = ref([])
 const noticeLoading = ref(false)
 const noticeDialogVisible = ref(false)
 const noticeDetail = ref({ title: '', date: '', author: '', content: '' })
-
-const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
-const nowDateText = new Date().toLocaleDateString('en-US', options)
 
 const formatTime = (val) => {
   if (!val) return '--'
@@ -115,17 +84,23 @@ const formatTime = (val) => {
 const loadSummary = async () => {
   try {
     const res = await getHomeSummaryAPI()
-    if (res.code === 200) summary.value = { ...summary.value, ...res.data }
-  } catch (error) {
-    ElMessage.error('Failed to load summary')
+    if (res.code === 200) {
+      summary.value = { ...summary.value, ...res.data }
+    }
+  } catch {
+    ElMessage.error('首页摘要加载失败')
   }
 }
 
 const loadNotices = async () => {
   noticeLoading.value = true
   try {
-    const res = await getNoticePageAPI({ pageNum: 1, pageSize: 5, status: 1 })
-    if (res.code === 200) noticeList.value = res.data?.records || []
+    const res = await getNoticePageAPI({ pageNum: 1, pageSize: 6 })
+    if (res.code === 200) {
+      noticeList.value = res.data?.records || []
+    }
+  } catch {
+    ElMessage.error('公告加载失败')
   } finally {
     noticeLoading.value = false
   }
@@ -138,52 +113,175 @@ const openNotice = async (row) => {
       noticeDetail.value = { ...res.data, date: formatTime(res.data?.date || res.data?.publishTime) }
       noticeDialogVisible.value = true
     }
-  } catch (error) {
-    ElMessage.error('Failed to load notice content')
+  } catch {
+    ElMessage.error('公告详情加载失败')
   }
 }
 
-const goStockWarning = (type = 'low') => {
-  router.push({ path: '/business/stock-warning', query: { type } })
-}
-
-onMounted(() => { loadSummary(); loadNotices(); })
+onMounted(() => {
+  loadSummary()
+  loadNotices()
+})
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-.admin-dashboard {
-  --bg-color: #f6f8fb; --text-primary: #111827; --text-secondary: #6b7280;
-  --glass-bg: rgba(255, 255, 255, 0.7); --glass-border: rgba(255, 255, 255, 0.5);
-  position: relative; min-height: calc(100vh - 100px); background: var(--bg-color); font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text-primary); overflow: hidden; padding: 40px; z-index: 1;
+
+.employee-dashboard {
+  min-height: calc(100vh - 100px);
+  padding: 36px;
+  background:
+    radial-gradient(circle at top right, rgba(5, 150, 105, 0.12), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(202, 138, 4, 0.1), transparent 28%),
+    linear-gradient(180deg, #f7fafc 0%, #edf4f7 100%);
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
-.glass-orb { position: absolute; border-radius: 50%; filter: blur(80px); z-index: -1; opacity: 0.6; }
-.shape-1 { width: 450px; height: 450px; top: -100px; right: -100px; }
-.shape-2 { width: 550px; height: 550px; bottom: -200px; left: -200px; }
-.content-wrapper { max-width: 1280px; margin: 0 auto; }
-.admin-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 48px; animation: slideDown 0.6s ease-out; }
-.eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 12px; display: block; }
-.admin-header h1 { font-size: 3rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; margin: 0; }
-.highlight-emp { background: linear-gradient(135deg, #059669, #ca8a04); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.glass-chip { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); padding: 10px 20px; border-radius: 100px; font-size: 0.875rem; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-.status-dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
-.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-bottom: 24px; animation: slideUp 0.6s ease-out 0.1s both; }
-.metric-glass { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 24px; padding: 24px; display: flex; align-items: flex-start; gap: 16px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05); transition: all 0.3s ease; }
-.card-hover:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 20px 40px -10px rgba(0,0,0,0.08); border-color: rgba(255,255,255,0.8); }
-.metric-content p { margin: 0 0 4px; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
-.metric-content h3 { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
-.layout-grid-full { display: grid; grid-template-columns: 1fr; gap: 24px; animation: slideUp 0.6s ease-out 0.2s both; }
-.card-glass { background: var(--glass-bg); backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 24px; padding: 32px; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05); }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.section-header h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
-.notice-count { font-size: 0.75rem; font-weight: 700; padding: 4px 12px; border-radius: 100px; background: #dcfce7; color: #059669; }
-.notice-list { display: flex; flex-direction: column; gap: 12px; }
-.notice-item { display: flex; justify-content: space-between; align-items: center; background: white; border-radius: 16px; padding: 24px; cursor: pointer; transition: all 0.2s; border: 1px solid rgba(0,0,0,0.02); }
-.notice-item:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.04); border-color: #dcfce7; }
-.notice-info h3 { margin: 0 0 4px; font-size: 1rem; font-weight: 600; color: var(--text-primary); }
-.notice-info p { margin: 0; font-size: 0.875rem; color: var(--text-secondary); }
-.notice-date { font-size: 0.875rem; font-weight: 500; color: #a1a1aa; }
-.empty-state { text-align: center; padding: 40px; color: var(--text-secondary); }
-@keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.dashboard-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.hero-card,
+.metric-card,
+.panel-card,
+.notice-item {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 45px -30px rgba(15, 23, 42, 0.3);
+}
+
+.hero-card {
+  border-radius: 28px;
+  padding: 32px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: #059669;
+}
+
+.hero-card h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  line-height: 1.06;
+  color: #0f172a;
+}
+
+.hero-desc {
+  margin: 14px 0 0;
+  color: #475569;
+  font-size: 1rem;
+}
+
+.hero-meta {
+  display: grid;
+  gap: 10px;
+  min-width: 240px;
+  color: #334155;
+  font-size: 0.95rem;
+  justify-items: end;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.metric-card {
+  border-radius: 22px;
+  padding: 22px;
+  display: grid;
+  gap: 8px;
+}
+
+.metric-label {
+  font-size: 0.86rem;
+  color: #64748b;
+}
+
+.metric-card strong {
+  font-size: 1.35rem;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.panel-card {
+  border-radius: 28px;
+  padding: 28px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #0f172a;
+}
+
+.panel-head span,
+.notice-meta,
+.notice-date,
+.empty-state {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.notice-list {
+  display: grid;
+  gap: 12px;
+}
+
+.notice-item {
+  width: 100%;
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.notice-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 45px -34px rgba(15, 23, 42, 0.5);
+}
+
+.notice-title {
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.notice-content {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  margin: 0;
+}
+
+@media (max-width: 960px) {
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-card {
+    flex-direction: column;
+  }
+}
 </style>

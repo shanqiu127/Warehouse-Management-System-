@@ -25,6 +25,7 @@ CREATE TABLE `sys_user` (
     `password` VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
     `real_name` VARCHAR(50) NOT NULL COMMENT '真实姓名',
     `role` VARCHAR(20) NOT NULL COMMENT '角色: superadmin-超级管理员, admin-管理员, employee-普通用户',
+    `dept_id` BIGINT DEFAULT NULL COMMENT '所属部门ID，superadmin 允许为空',
     `is_superadmin` TINYINT GENERATED ALWAYS AS (CASE WHEN `role` = 'superadmin' THEN 1 ELSE NULL END) STORED COMMENT '超级管理员唯一约束辅助列',
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1-启用, 0-禁用',
     `phone` VARCHAR(20) DEFAULT NULL COMMENT '手机号',
@@ -37,7 +38,8 @@ CREATE TABLE `sys_user` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_username` (`username`),
     UNIQUE KEY `uk_only_one_superadmin` (`is_superadmin`),
-    KEY `idx_role_status` (`role`, `status`),
+    KEY `idx_role_dept_status` (`role`, `dept_id`, `status`),
+    KEY `idx_dept_id` (`dept_id`),
     KEY `idx_is_deleted` (`is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
@@ -88,6 +90,8 @@ CREATE TABLE `sys_notice` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `title` VARCHAR(100) NOT NULL COMMENT '公告标题',
     `content` TEXT COMMENT '公告内容',
+    `target_role` VARCHAR(20) NOT NULL DEFAULT 'all' COMMENT '受众角色: admin/employee/all',
+    `target_dept_id` BIGINT DEFAULT NULL COMMENT '目标部门ID，空表示该角色全体',
     `publisher` VARCHAR(50) NOT NULL COMMENT '发布人',
     `publish_time` DATETIME DEFAULT NULL COMMENT '发布时间',
     `status` TINYINT NOT NULL DEFAULT 0 COMMENT '状态: 1-已发布, 0-草稿',
@@ -95,6 +99,7 @@ CREATE TABLE `sys_notice` (
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
     PRIMARY KEY (`id`),
+    KEY `idx_target_role_dept_status` (`target_role`, `target_dept_id`, `status`),
     KEY `idx_status` (`status`),
     KEY `idx_publish_time` (`publish_time`),
     KEY `idx_is_deleted` (`is_deleted`)
@@ -432,13 +437,20 @@ CREATE TABLE `biz_approval_order` (
 -- 四、初始化测试数据
 -- =============================================
 
--- 4.1 初始化管理员账号
--- 用户名: admin  / superadmin / employee / lisi, 密码均为 123456
-INSERT INTO `sys_user` (`id`, `username`, `password`, `real_name`, `role`, `status`, `phone`, `email`) VALUES
-(1, 'admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '系统管理员', 'admin', 1, '13800138000', 'admin@warehouse.com'),
-(2, 'employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '普通员工', 'employee', 1, '13900139000', 'employee@warehouse.com'),
-(3, 'lisi', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', 1, '13600136000', 'lisi@warehouse.com'),
-(4, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', 1, '13700137000', 'superadmin@warehouse.com');
+-- 4.1 初始化账号（5 个部门管理员 + 5 个部门员工 + 1 个超级管理员）
+-- 全部默认密码均为 123456
+INSERT INTO `sys_user` (`id`, `username`, `password`, `real_name`, `role`, `dept_id`, `status`, `phone`, `email`) VALUES
+(1, 'hr_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '人事管理员', 'admin', 5, 1, '13800138000', 'hr_admin@warehouse.com'),
+(2, 'purchase_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '采购管理员', 'admin', 4, 1, '13800138001', 'purchase_admin@warehouse.com'),
+(3, 'sales_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '销售管理员', 'admin', 2, 1, '13800138002', 'sales_admin@warehouse.com'),
+(4, 'sales_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', 2, 1, '13800138003', 'sales_employee@warehouse.com'),
+(5, 'warehouse_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '仓储管理员', 'admin', 3, 1, '13800138004', 'warehouse_admin@warehouse.com'),
+(6, 'finance_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '财务管理员', 'admin', 1, 1, '13800138005', 'finance_admin@warehouse.com'),
+(7, 'hr_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '人事员工', 'employee', 5, 1, '13800138006', 'hr_employee@warehouse.com'),
+(8, 'purchase_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '采购员工', 'employee', 4, 1, '13800138007', 'purchase_employee@warehouse.com'),
+(9, 'warehouse_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '仓储员工', 'employee', 3, 1, '13800138008', 'warehouse_employee@warehouse.com'),
+(10, 'finance_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '财务员工', 'employee', 1, 1, '13800138009', 'finance_employee@warehouse.com'),
+(11, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', NULL, 1, '13800138010', 'superadmin@warehouse.com');
 
 -- 4.1.1 初始化IP策略示例数据
 INSERT INTO `sys_ip_policy` (`policy_name`, `ip_cidr`, `allow_flag`, `status`, `priority`, `remark`) VALUES
@@ -446,19 +458,19 @@ INSERT INTO `sys_ip_policy` (`policy_name`, `ip_cidr`, `allow_flag`, `status`, `
 
 -- 4.2 初始化部门数据
 INSERT INTO `sys_dept` (`dept_name`, `dept_code`, `leader`, `phone`, `description`) VALUES
-('管理部', 'DEPT001', '张总', '021-12345678', '负责公司整体管理'),
-('采购部', 'DEPT002', '王经理', '021-12345679', '负责商品采购'),
-('销售部', 'DEPT003', '李经理', '021-12345680', '负责商品销售'),
-('仓储部', 'DEPT004', '赵经理', '021-12345681', '负责仓储管理'),
-('财务部', 'DEPT005', '孙经理', '021-12345682', '负责财务管理');
+('财务部', 'finance', '孙经理', '021-12345682', '负责财务报表与经营分析'),
+('销售部', 'sales', '李经理', '021-12345680', '负责销售业务管理'),
+('仓储部', 'warehouse', '赵经理', '021-12345681', '负责仓储、库存与作废审批管理'),
+('采购部', 'purchase', '王经理', '021-12345679', '负责采购与退货业务管理'),
+('人事部', 'hr', '张总', '021-12345678', '负责组织与人事管理');
 
 -- 4.3 初始化员工数据
 INSERT INTO `sys_employee` (`emp_code`, `emp_name`, `dept_id`, `position`, `phone`, `email`) VALUES
-('EMP001', '张三', 2, '采购专员', '13800138001', 'zhangsan@warehouse.com'),
-('EMP002', '李四', 3, '销售代表', '13800138002', 'lisi@warehouse.com'),
-('EMP003', '王五', 4, '仓管员', '13800138003', 'wangwu@warehouse.com'),
-('EMP004', '赵六', 5, '会计', '13800138004', 'zhaoliu@warehouse.com'),
-('EMP005', '孙七', 2, '采购专员', '13800138005', 'sunqi@warehouse.com');
+('EMP001', '财务员工', 1, '财务专员', '13800138101', 'finance_employee@warehouse.com'),
+('EMP002', '李四', 2, '销售代表', '13800138102', 'sales_employee@warehouse.com'),
+('EMP003', '仓储员工', 3, '仓管员', '13800138103', 'warehouse_employee@warehouse.com'),
+('EMP004', '采购员工', 4, '采购专员', '13800138104', 'purchase_employee@warehouse.com'),
+('EMP005', '人事员工', 5, '人事专员', '13800138105', 'hr_employee@warehouse.com');
 
 -- 4.4 初始化供应商数据
 INSERT INTO `base_supplier` (`supplier_code`, `supplier_name`, `contact_person`, `contact_phone`, `address`, `description`) VALUES
@@ -667,11 +679,10 @@ WHERE is_deleted = 0
 -- MODIFY COLUMN `cost_source` VARCHAR(30) NOT NULL DEFAULT 'ZERO_FALLBACK';
 
 -- 4.10 初始化公告数据
-INSERT INTO `sys_notice` (`title`, `content`, `publisher`, `publish_time`, `status`) VALUES
-('系统升级通知', '尊敬的用户，系统将于2025年3月15日凌晨2:00-4:00进行升级维护，期间暂停服务。', '系统管理员', '2025-03-10 10:00:00', 1),
-('库存管理制度更新', '请各部门注意，新的库存管理制度已生效，请严格按照规定执行。', '系统管理员', '2025-03-08 14:00:00', 1),
-('节后工作安排', '春节假期结束后，各部门请做好工作安排，确保正常运营。', '系统管理员', '2025-02-25 09:00:00', 1),
-('新品上架通知', '惠普打印机、爱普生投影仪、佳能扫描仪等办公用品已上架，请关注。', '系统管理员', '2025-03-01 10:00:00', 1);
+INSERT INTO `sys_notice` (`title`, `content`, `target_role`, `target_dept_id`, `publisher`, `publish_time`, `status`) VALUES
+('管理员月度例会通知', '请各部门管理员于本周五下午参加月度管理例会，汇报本部门重点事项。', 'admin', NULL, '超级管理员', '2025-03-10 10:00:00', 1),
+('全员制度更新通知', '仓库管理制度已完成统一修订，请全体账号登录后及时查阅并执行。', 'all', NULL, '超级管理员', '2025-03-08 14:00:00', 1),
+('仓储部盘点安排', '仓储部员工请于本周三下班前完成月度盘点，并提交差异说明。', 'employee', 3, '仓储管理员', '2025-03-09 09:30:00', 1);
 
 -- =============================================
 -- 五、视图 (便于前端查询)

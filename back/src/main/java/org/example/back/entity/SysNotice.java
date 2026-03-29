@@ -18,6 +18,10 @@ public class SysNotice {
 
     private String content;
 
+    private String targetRole;
+
+    private Long targetDeptId;
+
     private String publisher;
 
     private LocalDateTime publishTime;

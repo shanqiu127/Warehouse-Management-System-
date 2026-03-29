@@ -11,9 +11,11 @@ import org.example.back.dto.DocumentVoidDTO;
 import org.example.back.dto.SalesReturnQueryDTO;
 import org.example.back.dto.SalesReturnSaveDTO;
 import org.example.back.entity.BaseGoods;
+import org.example.back.entity.BizApprovalOrder;
 import org.example.back.entity.BizSales;
 import org.example.back.entity.BizSalesReturn;
 import org.example.back.mapper.BaseGoodsMapper;
+import org.example.back.mapper.BizApprovalOrderMapper;
 import org.example.back.mapper.BizPurchaseMapper;
 import org.example.back.mapper.BizSalesMapper;
 import org.example.back.mapper.BizSalesReturnMapper;
@@ -27,7 +29,9 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class SalesReturnService {
@@ -45,9 +49,20 @@ public class SalesReturnService {
     private BizPurchaseMapper bizPurchaseMapper;
 
     @Autowired
+    private BizApprovalOrderMapper bizApprovalOrderMapper;
+
+    @Autowired
     private AuthService authService;
 
+    @Autowired
+    private AuthzService authzService;
+
+    private void requireSalesReturnModuleAccess() {
+        authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_SALES, "仅销售部门管理员可访问销售退货模块");
+    }
+
     public PageResult<SalesReturnVO> page(SalesReturnQueryDTO queryDTO) {
+        requireSalesReturnModuleAccess();
         LocalDateTime startTime = queryDTO.getStartDate() == null ? null : queryDTO.getStartDate().atStartOfDay();
         LocalDateTime endTime = queryDTO.getEndDate() == null ? null : queryDTO.getEndDate().plusDays(1).atStartOfDay();
 
@@ -60,17 +75,20 @@ public class SalesReturnService {
                 .orderByDesc(BizSalesReturn::getId);
 
         Page<BizSalesReturn> page = bizSalesReturnMapper.selectPage(new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize()), wrapper);
-        List<SalesReturnVO> records = page.getRecords().stream().map(this::toVO).toList();
+        Map<Long, BizApprovalOrder> approvalMap = buildLatestApprovalMap(page.getRecords().stream().map(BizSalesReturn::getId).toList());
+        List<SalesReturnVO> records = page.getRecords().stream().map(item -> toVO(item, approvalMap.get(item.getId()))).toList();
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
     public SalesReturnVO getById(Long id) {
+        requireSalesReturnModuleAccess();
         BizSalesReturn entity = requireEntity(id);
-        return toVO(entity);
+        return toVO(entity, resolveLatestApproval(entity.getId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void create(SalesReturnSaveDTO dto) {
+        requireSalesReturnModuleAccess();
         validateQuantity(dto.getQuantity());
 
         BizSales sourceSales = requireSourceSales(dto.getSourceSalesId());
@@ -109,6 +127,7 @@ public class SalesReturnService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        requireSalesReturnModuleAccess();
         BizSalesReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "客退单");
         validateDeleteWindow(entity.getOperationTime(), "客退单");
@@ -119,6 +138,7 @@ public class SalesReturnService {
     @Transactional(rollbackFor = Exception.class)
     // 作废单据，更新单据状态并记录作废信息，同时根据前端请求决定是否创建对应的红冲单
     public void voidDocument(Long id, DocumentVoidDTO dto) {
+        requireSalesReturnVoidExecutionAccess();
         BizSalesReturn entity = requireEntity(id);
         ensureNormalStatus(entity.getBizStatus(), "客退单");
 
@@ -160,6 +180,16 @@ public class SalesReturnService {
             redFlushDoc.setVoidReason(reason);
             bizSalesReturnMapper.insert(redFlushDoc);
         }
+    }
+
+    private void requireSalesReturnVoidExecutionAccess() {
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_WAREHOUSE)) {
+            return;
+        }
+        if (authzService.hasDeptAdminOrSuperAdminAccess(AuthzService.DEPT_SALES)) {
+            throw BusinessException.validateFail("历史销售退货单作废/红冲需提交仓储审批");
+        }
+        throw BusinessException.forbidden("仅销售部门管理员可发起销售退货作废申请，且需由仓储部门审批");
     }
     
     private BizSalesReturn requireEntity(Long id) {
@@ -294,7 +324,26 @@ public class SalesReturnService {
         }
     }
 
-    private SalesReturnVO toVO(BizSalesReturn entity) {
+    private Map<Long, BizApprovalOrder> buildLatestApprovalMap(List<Long> bizIds) {
+        if (bizIds.isEmpty()) {
+            return Map.of();
+        }
+        LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizApprovalOrder::getBizType, "sales_return")
+                .in(BizApprovalOrder::getBizId, bizIds)
+                .orderByDesc(BizApprovalOrder::getId);
+        Map<Long, BizApprovalOrder> approvalMap = new LinkedHashMap<>();
+        for (BizApprovalOrder item : bizApprovalOrderMapper.selectList(wrapper)) {
+            approvalMap.putIfAbsent(item.getBizId(), item);
+        }
+        return approvalMap;
+    }
+
+    private BizApprovalOrder resolveLatestApproval(Long bizId) {
+        return buildLatestApprovalMap(List.of(bizId)).get(bizId);
+    }
+
+    private SalesReturnVO toVO(BizSalesReturn entity, BizApprovalOrder approvalOrder) {
         SalesReturnVO vo = new SalesReturnVO();
         BeanUtils.copyProperties(entity, vo);
         LocalDateTime bizTime = entity.getOperationTime() == null ? entity.getCreateTime() : entity.getOperationTime();
@@ -310,6 +359,8 @@ public class SalesReturnService {
         vo.setSourceId(entity.getSourceId());
         vo.setVoidTime(entity.getVoidTime());
         vo.setVoidReason(entity.getVoidReason());
+        vo.setApprovalStatus(approvalOrder == null ? null : approvalOrder.getStatus());
+        vo.setApprovalRequestAction(approvalOrder == null ? null : approvalOrder.getRequestAction());
         return vo;
     }
 
