@@ -17,9 +17,10 @@
       <el-table-column prop="manager" label="负责人（可多位）" />
       <el-table-column prop="contactPhone" label="联系电话" />
       <el-table-column prop="createTime" label="创建时间" />
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作状态" width="150" fixed="right">
         <template #default="scope">
-          <el-button size="small" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-button v-if="canEditDept(scope.row)" size="small" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-tag v-else :type="getDeptStatusType(scope.row)">{{ getDeptStatusLabel(scope.row) }}</el-tag>
         </template>
       </el-table-column>
     </el-table>
@@ -53,22 +54,26 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave">确认</el-button>
+        <el-button type="primary" @click="handleSave">{{ saveButtonText }}</el-button>
       </template>
     </el-dialog>
   </el-card>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   createDeptAPI,
-  deleteDeptAPI,
   getDeptDetailAPI,
   getDeptPageAPI,
   updateDeptAPI
 } from '@/api/system'
+
+const STATUS_PENDING = 1
+const STATUS_APPROVED = 2
+const STATUS_REJECTED = 3
+const SYSTEM_MANAGEMENT_CODE = 'system_management'
 
 const searchForm = reactive({ deptName: '' })
 const tableData = ref([])
@@ -81,6 +86,7 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('新增部门')
 const formRef = ref(null)
 const form = reactive({ id: null, deptName: '', manager: '', contactPhone: '', description: '' })
+const saveButtonText = computed(() => (form.id ? '确认' : '提交审批请求'))
 
 const rules = {
   deptName: [{ required: true, message: '请输入部门名称', trigger: 'blur' }]
@@ -89,6 +95,22 @@ const rules = {
 const normalizeDateTime = (val) => {
   if (!val) return ''
   return String(val).replace('T', ' ')
+}
+
+const canEditDept = (row) => row?.status === STATUS_APPROVED && row?.deptCode !== SYSTEM_MANAGEMENT_CODE
+
+const getDeptStatusLabel = (row) => {
+  if (row?.deptCode === SYSTEM_MANAGEMENT_CODE) return '系统预置'
+  if (row?.status === STATUS_PENDING) return '待审批'
+  if (row?.status === STATUS_REJECTED) return '驳回'
+  return '编辑'
+}
+
+const getDeptStatusType = (row) => {
+  if (row?.deptCode === SYSTEM_MANAGEMENT_CODE) return 'info'
+  if (row?.status === STATUS_PENDING) return 'warning'
+  if (row?.status === STATUS_REJECTED) return 'danger'
+  return 'success'
 }
 
 const loadList = async () => {
@@ -171,19 +193,6 @@ const handleEdit = async (row) => {
   }
 }
 
-const handleDelete = (row) => {
-  ElMessageBox.confirm('确认删除该部门?', '提示', { type: 'warning' })
-    .then(async () => {
-      const res = await deleteDeptAPI(row.id)
-      if (res.code !== 200) {
-        throw new Error(res.msg || '删除失败')
-      }
-      ElMessage.success('删除成功')
-      await loadList()
-    })
-    .catch(() => {})
-}
-
 const handleSave = () => {
   formRef.value?.validate(async (valid) => {
     if (!valid) return
@@ -198,7 +207,7 @@ const handleSave = () => {
       if (res.code !== 200) {
         throw new Error(res.msg || '保存失败')
       }
-      ElMessage.success(form.id ? '修改成功' : '新增成功')
+      ElMessage.success(form.id ? '修改成功' : '已提交审批请求')
       dialogVisible.value = false
       await loadList()
     } catch (error) {

@@ -8,4 +8,8 @@ import lombok.EqualsAndHashCode;
 public class DeptQueryDTO extends PageQuery {
 
     private String deptName;
+
+    private String requesterName;
+
+    private Integer status;
 }

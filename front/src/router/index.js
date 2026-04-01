@@ -7,6 +7,7 @@ const SUPERADMIN_ALLOWED_PATHS = new Set([
   '/home',
   '/system/notice',
   '/system/super-admin',
+  '/system/dept-approval',
   '/system/user',
   '/system/security-ip-policy',
   '/system/login-log',
@@ -120,6 +121,12 @@ const router = createRouter({
           path: "system/super-admin",
           name: "SystemSuperAdmin",
           component: () => import("../views/system/SuperAdminDashboardView.vue"),
+          meta: { roles: ['superadmin'] }
+        },
+        {
+          path: "system/dept-approval",
+          name: "SystemDeptApproval",
+          component: () => import("../views/system/DeptApprovalView.vue"),
           meta: { roles: ['superadmin'] }
         },
         {

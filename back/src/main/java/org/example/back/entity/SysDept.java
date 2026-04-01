@@ -25,6 +25,25 @@ public class SysDept {
 
     private String description;
 
+    /**
+     * 1-待审批, 2-已生效, 3-已驳回
+     */
+    private Integer status;
+
+    private Long requesterId;
+
+    private String requesterName;
+
+    private Long approverId;
+
+    private String approverName;
+
+    private String approvalRemark;
+
+    private LocalDateTime approvedAt;
+
+    private LocalDateTime rejectedAt;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;

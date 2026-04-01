@@ -15,6 +15,8 @@ public class SysEmployee {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    private Long userId;
+
     private String empCode;
 
     private String empName;

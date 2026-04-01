@@ -12,6 +12,11 @@
     </section>
 
     <section class="metric-grid" v-loading="loading">
+      <article class="metric-card metric-card-accent">
+        <p>待审批部门</p>
+        <strong>{{ metrics.pendingDeptApprovalCount }}</strong>
+        <span>人事提交的新部门请求</span>
+      </article>
       <article class="metric-card">
         <p>启用策略</p>
         <strong>{{ metrics.enabledPolicyCount }}</strong>
@@ -35,6 +40,11 @@
     </section>
 
     <section class="nav-grid">
+      <article class="nav-card" @click="go('/system/dept-approval')">
+        <h3>部门审批</h3>
+        <p>审核人事提交的新部门请求，并决定是否正式生效。</p>
+        <el-button type="primary" text>进入页面</el-button>
+      </article>
       <article class="nav-card" @click="go('/system/security-ip-policy')">
         <h3>安全策略</h3>
         <p>维护 IP 白名单策略，控制登录入口边界。</p>
@@ -80,12 +90,14 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getEnabledIpPoliciesAPI, getIpPolicyPageAPI } from '@/api/security'
 import { getLoginLogPageAPI, getOperationLogPageAPI } from '@/api/audit'
+import { getDeptPageAPI } from '@/api/system'
 
 const router = useRouter()
 const loading = ref(false)
 const recentOperations = ref([])
 
 const metrics = reactive({
+  pendingDeptApprovalCount: 0,
   enabledPolicyCount: 0,
   policyTotal: 0,
   loginLogTotal: 0,
@@ -104,22 +116,25 @@ const go = (path) => {
 const loadDashboard = async () => {
   loading.value = true
   try {
-    const [enabledRes, policyRes, loginRes, operationRes] = await Promise.all([
+    const [enabledRes, policyRes, loginRes, operationRes, deptApprovalRes] = await Promise.all([
       getEnabledIpPoliciesAPI(),
       getIpPolicyPageAPI({ pageNum: 1, pageSize: 1 }),
       getLoginLogPageAPI({ pageNum: 1, pageSize: 1 }),
-      getOperationLogPageAPI({ pageNum: 1, pageSize: 5 })
+      getOperationLogPageAPI({ pageNum: 1, pageSize: 5 }),
+      getDeptPageAPI({ pageNum: 1, pageSize: 5, status: 1 })
     ])
 
     if (enabledRes.code !== 200) throw new Error(enabledRes.msg || '加载启用策略失败')
     if (policyRes.code !== 200) throw new Error(policyRes.msg || '加载策略总数失败')
     if (loginRes.code !== 200) throw new Error(loginRes.msg || '加载登录日志总数失败')
     if (operationRes.code !== 200) throw new Error(operationRes.msg || '加载操作日志失败')
+    if (deptApprovalRes.code !== 200) throw new Error(deptApprovalRes.msg || '加载部门审批失败')
 
     metrics.enabledPolicyCount = Array.isArray(enabledRes.data) ? enabledRes.data.length : 0
     metrics.policyTotal = Number(policyRes.data?.total || 0)
     metrics.loginLogTotal = Number(loginRes.data?.total || 0)
     metrics.operationLogTotal = Number(operationRes.data?.total || 0)
+    metrics.pendingDeptApprovalCount = Number(deptApprovalRes.data?.total || 0)
     recentOperations.value = operationRes.data?.records || []
   } catch (error) {
     ElMessage.error(error.message || '加载超管总览失败')
@@ -205,9 +220,14 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.metric-card-accent {
+  border-color: rgba(46, 78, 102, 0.26);
+  background: rgba(241, 247, 251, 0.9);
 }
 
 .metric-card {
@@ -242,7 +262,7 @@ onMounted(() => {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }

@@ -19,6 +19,8 @@ export const getDeptOptionsAPI = () => request.get('/system/depts/options')
 export const getDeptDetailAPI = (id) => request.get(`/system/depts/${id}`)
 export const createDeptAPI = (data) => request.post('/system/depts', data)
 export const updateDeptAPI = (id, data) => request.put(`/system/depts/${id}`, data)
+export const approveDeptAPI = (id, data) => request.put(`/system/depts/${id}/approve`, data)
+export const rejectDeptAPI = (id, data) => request.put(`/system/depts/${id}/reject`, data)
 export const deleteDeptAPI = (id) => request.delete(`/system/depts/${id}`)
 
 export const getEmployeePageAPI = (params) => request.get('/system/employees/page', { params })

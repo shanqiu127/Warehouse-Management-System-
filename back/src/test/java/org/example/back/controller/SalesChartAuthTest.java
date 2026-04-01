@@ -25,6 +25,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -40,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SalesChartAuthTest {
 
     private static final String DEVICE = "PC";
+    private static final AtomicLong TEST_USER_ID_SEQUENCE = new AtomicLong(20000L);
 
     @SpringBootConfiguration
     @EnableAutoConfiguration(exclude = {
@@ -65,6 +67,10 @@ class SalesChartAuthTest {
     @org.springframework.beans.factory.annotation.Autowired
     private MockMvc mockMvc;
 
+    private String loginWithRole(String role) {
+        return loginWithRole(TEST_USER_ID_SEQUENCE.incrementAndGet(), role);
+    }
+
     private String loginWithRole(long userId, String role) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -82,7 +88,7 @@ class SalesChartAuthTest {
 
     @Test
     void SalesChartApi_shouldRejectEmployeeDirectAccess() throws Exception {
-        String token = loginWithRole(20001L, "employee");
+        String token = loginWithRole("employee");
 
         mockMvc.perform(get("/business/charts/overview")
                         .header("Authorization", "Bearer " + token))
@@ -95,7 +101,7 @@ class SalesChartAuthTest {
         when(salesChartService.getOverview(any()))
                 .thenReturn(buildOverview());
 
-        String token = loginWithRole(20002L, "admin");
+        String token = loginWithRole("admin");
 
         mockMvc.perform(get("/business/charts/overview")
                         .header("Authorization", "Bearer " + token))
@@ -108,7 +114,7 @@ class SalesChartAuthTest {
         when(salesChartService.getOverview(any()))
                 .thenReturn(buildOverview());
 
-        String token = loginWithRole(20003L, "superadmin");
+        String token = loginWithRole("superadmin");
 
         mockMvc.perform(get("/business/charts/overview")
                         .header("Authorization", "Bearer " + token))
@@ -121,7 +127,7 @@ class SalesChartAuthTest {
         when(salesChartService.getProfitOverview(any()))
             .thenReturn(buildProfitOverview());
 
-        String token = loginWithRole(20004L, "admin");
+        String token = loginWithRole("admin");
 
         mockMvc.perform(get("/business/charts/profit-overview")
                 .header("Authorization", "Bearer " + token))
@@ -131,7 +137,7 @@ class SalesChartAuthTest {
 
     @Test
         void ProfitApi_shouldRejectSuperAdminWhenAdminOnly() throws Exception {
-        String token = loginWithRole(20005L, "superadmin");
+        String token = loginWithRole("superadmin");
 
         mockMvc.perform(get("/business/charts/profit-overview")
                 .header("Authorization", "Bearer " + token))

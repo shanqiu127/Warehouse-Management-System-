@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.example.back.common.exception.BusinessException;
 import org.example.back.common.result.PageResult;
 import org.example.back.dto.LoginLogQueryDTO;
-import org.example.back.dto.LoginResponse;
 import org.example.back.dto.OperationLogQueryDTO;
 import org.example.back.entity.SysLoginLog;
 import org.example.back.entity.SysOperationLog;
@@ -25,9 +24,6 @@ public class AuditService {
 
     @Autowired
     private SysOperationLogMapper sysOperationLogMapper;
-
-    @Autowired
-    private AuthService authService;
 
     @Autowired
     private AuthzService authzService;

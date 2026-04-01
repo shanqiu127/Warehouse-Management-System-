@@ -18,6 +18,7 @@
 
     <el-table :data="tableData" border style="width: 100%" v-loading="loading">
       <el-table-column prop="empCode" label="员工工号" width="120" />
+      <el-table-column prop="username" label="登录账号" width="140" />
       <el-table-column prop="empName" label="员工姓名" />
       <el-table-column prop="position" label="职位" width="120" />
       <el-table-column prop="phone" label="联系电话" />
@@ -29,8 +30,13 @@
       </el-table-column>
       <el-table-column label="操作" width="150" fixed="right">
         <template #default="scope">
-          <el-button size="small" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          <template v-if="isReadOnlyRow(scope.row)">
+            <el-tag type="info">只读展示</el-tag>
+          </template>
+          <template v-else>
+            <el-button size="small" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
@@ -49,6 +55,9 @@
 
     <el-dialog :title="dialogTitle" v-model="dialogVisible" width="450px">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="80px">
+        <el-form-item label="登录账号" prop="username">
+          <el-input v-model="form.username"></el-input>
+        </el-form-item>
         <el-form-item label="员工姓名" prop="empName">
           <el-input v-model="form.empName"></el-input>
         </el-form-item>
@@ -57,7 +66,7 @@
         </el-form-item>
         <el-form-item label="所属部门" prop="deptId">
           <el-select v-model="form.deptId" placeholder="请选择分配部门" style="width: 100%;">
-            <el-option v-for="dept in depts" :key="dept.id" :label="dept.name" :value="dept.id" />
+            <el-option v-for="dept in editableDeptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="联系电话">
@@ -72,6 +81,9 @@
             <el-radio :value="0">离职</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item v-if="!form.id" label="初始密码">
+          <span class="form-tip">默认密码为 123456，创建后可在用户管理中重置。</span>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -82,7 +94,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createEmployeeAPI,
@@ -93,7 +105,10 @@ import {
   updateEmployeeAPI
 } from '@/api/system'
 
+const SYSTEM_MANAGEMENT_DEPT_NAME = '系统管理部'
+
 const depts = ref([])
+const editableDeptOptions = computed(() => depts.value.filter((dept) => dept.name !== SYSTEM_MANAGEMENT_DEPT_NAME))
 
 const searchForm = reactive({ empName: '', deptId: null })
 const tableData = ref([])
@@ -105,12 +120,15 @@ const total = ref(0)
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增员工')
 const formRef = ref(null)
-const form = reactive({ id: null, empName: '', deptId: null, position: '', phone: '', email: '', status: 1 })
+const form = reactive({ id: null, username: '', empName: '', deptId: null, position: '', phone: '', email: '', status: 1 })
 
 const rules = {
+  username: [{ required: true, message: '请输入登录账号', trigger: 'blur' }],
   empName: [{ required: true, message: '请输入员工姓名', trigger: 'blur' }],
   deptId: [{ required: true, message: '请选择所属部门', trigger: 'change' }]
 }
+
+const isReadOnlyRow = (row) => row?.readOnly === true
 
 const loadDeptOptions = async () => {
   const res = await getDeptOptionsAPI()
@@ -169,6 +187,7 @@ const handleCurrentChange = (val) => {
 const handleAdd = () => {
   dialogTitle.value = '新增员工'
   form.id = null
+  form.username = ''
   form.empName = ''
   form.deptId = null
   form.position = ''
@@ -189,6 +208,7 @@ const handleEdit = async (row) => {
     dialogTitle.value = '编辑员工'
     Object.assign(form, {
       id: detail.id,
+      username: detail.username || '',
       empName: detail.empName || '',
       deptId: detail.deptId || null,
       position: detail.position || '',
@@ -221,6 +241,7 @@ const handleSave = () => {
     if (!valid) return
     try {
       const payload = {
+        username: form.username,
         empName: form.empName,
         deptId: form.deptId,
         position: form.position || '',
@@ -232,7 +253,7 @@ const handleSave = () => {
       if (res.code !== 200) {
         throw new Error(res.msg || '保存失败')
       }
-      ElMessage.success(form.id ? '修改成功' : '新增成功')
+      ElMessage.success(form.id ? '修改成功' : '新增成功，初始密码为 123456')
       dialogVisible.value = false
       await loadList()
     } catch (error) {
@@ -250,3 +271,11 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.form-tip {
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.5;
+}
+</style>

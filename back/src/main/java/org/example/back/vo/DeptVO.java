@@ -23,5 +23,17 @@ public class DeptVO {
 
     private String description;
 
+    private Integer status;
+
+    private String requesterName;
+
+    private String approverName;
+
+    private String approvalRemark;
+
+    private LocalDateTime approvedAt;
+
+    private LocalDateTime rejectedAt;
+
     private LocalDateTime createTime;
 }

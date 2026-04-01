@@ -9,6 +9,8 @@ public class EmployeeVO {
 
     private Long id;
 
+    private String username;
+
     private String empCode;
 
     private String empName;
@@ -26,6 +28,8 @@ public class EmployeeVO {
     private String email;
 
     private Integer status;
+
+    private Boolean readOnly;
 
     private LocalDateTime createTime;
 }

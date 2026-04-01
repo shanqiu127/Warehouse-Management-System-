@@ -53,11 +53,20 @@ CREATE TABLE `sys_dept` (
     `leader` VARCHAR(50) DEFAULT NULL COMMENT '部门负责人',
     `phone` VARCHAR(20) DEFAULT NULL COMMENT '联系电话',
     `description` VARCHAR(200) DEFAULT NULL COMMENT '描述',
+    `status` TINYINT NOT NULL DEFAULT 2 COMMENT '状态: 1-待审批, 2-已生效, 3-已驳回',
+    `requester_id` BIGINT DEFAULT NULL COMMENT '提交人ID',
+    `requester_name` VARCHAR(50) DEFAULT NULL COMMENT '提交人姓名',
+    `approver_id` BIGINT DEFAULT NULL COMMENT '审批人ID',
+    `approver_name` VARCHAR(50) DEFAULT NULL COMMENT '审批人姓名',
+    `approval_remark` VARCHAR(200) DEFAULT NULL COMMENT '审批备注',
+    `approved_at` DATETIME DEFAULT NULL COMMENT '审批通过时间',
+    `rejected_at` DATETIME DEFAULT NULL COMMENT '审批驳回时间',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_dept_code` (`dept_code`),
+    KEY `idx_status_rejected_at` (`status`, `rejected_at`),
     KEY `idx_is_deleted` (`is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门表';
 
@@ -66,6 +75,7 @@ CREATE TABLE `sys_dept` (
 DROP TABLE IF EXISTS `sys_employee`;
 CREATE TABLE `sys_employee` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `user_id` BIGINT DEFAULT NULL COMMENT '关联用户ID',
     `emp_code` VARCHAR(20) NOT NULL COMMENT '员工工号',
     `emp_name` VARCHAR(50) NOT NULL COMMENT '员工姓名',
     `dept_id` BIGINT NOT NULL COMMENT '部门ID',
@@ -77,6 +87,7 @@ CREATE TABLE `sys_employee` (
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
     PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_user_id` (`user_id`),
     UNIQUE KEY `uk_emp_code` (`emp_code`),
     KEY `idx_dept_id` (`dept_id`),
     KEY `idx_dept_status` (`dept_id`, `status`),
@@ -437,40 +448,42 @@ CREATE TABLE `biz_approval_order` (
 -- 四、初始化测试数据
 -- =============================================
 
--- 4.1 初始化账号（5 个部门管理员 + 5 个部门员工 + 1 个超级管理员）
--- 全部默认密码均为 123456
-INSERT INTO `sys_user` (`id`, `username`, `password`, `real_name`, `role`, `dept_id`, `status`, `phone`, `email`) VALUES
-(1, 'hr_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '人事管理员', 'admin', 5, 1, '13800138000', 'hr_admin@warehouse.com'),
-(2, 'purchase_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '采购管理员', 'admin', 4, 1, '13800138001', 'purchase_admin@warehouse.com'),
-(3, 'sales_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '销售管理员', 'admin', 2, 1, '13800138002', 'sales_admin@warehouse.com'),
-(4, 'sales_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', 2, 1, '13800138003', 'sales_employee@warehouse.com'),
-(5, 'warehouse_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '仓储管理员', 'admin', 3, 1, '13800138004', 'warehouse_admin@warehouse.com'),
-(6, 'finance_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '财务管理员', 'admin', 1, 1, '13800138005', 'finance_admin@warehouse.com'),
-(7, 'hr_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '人事员工', 'employee', 5, 1, '13800138006', 'hr_employee@warehouse.com'),
-(8, 'purchase_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '采购员工', 'employee', 4, 1, '13800138007', 'purchase_employee@warehouse.com'),
-(9, 'warehouse_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '仓储员工', 'employee', 3, 1, '13800138008', 'warehouse_employee@warehouse.com'),
-(10, 'finance_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '财务员工', 'employee', 1, 1, '13800138009', 'finance_employee@warehouse.com'),
-(11, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', NULL, 1, '13800138010', 'superadmin@warehouse.com');
-
--- 4.1.1 初始化IP策略示例数据
-INSERT INTO `sys_ip_policy` (`policy_name`, `ip_cidr`, `allow_flag`, `status`, `priority`, `remark`) VALUES
-('本机回环地址', '127.0.0.1/32', 1, 1, 1, '开发环境白名单');
-
--- 4.2 初始化部门数据
+-- 4.1 初始化部门数据
 INSERT INTO `sys_dept` (`dept_name`, `dept_code`, `leader`, `phone`, `description`) VALUES
 ('财务部', 'finance', '孙经理', '021-12345682', '负责财务报表与经营分析'),
 ('销售部', 'sales', '李经理', '021-12345680', '负责销售业务管理'),
 ('仓储部', 'warehouse', '赵经理', '021-12345681', '负责仓储、库存与作废审批管理'),
 ('采购部', 'purchase', '王经理', '021-12345679', '负责采购与退货业务管理'),
-('人事部', 'hr', '张总', '021-12345678', '负责组织与人事管理');
+('人事部', 'hr', '张总', '021-12345678', '负责组织与人事管理'),
+('系统管理部', 'system_management', '平台管理员', '021-12345677', '用于展示系统管理员与超级管理员信息');
+
+-- 4.1.1 初始化IP策略示例数据
+INSERT INTO `sys_ip_policy` (`policy_name`, `ip_cidr`, `allow_flag`, `status`, `priority`, `remark`) VALUES
+('本机回环地址', '127.0.0.1/32', 1, 1, 1, '开发环境白名单');
+
+-- 4.2 初始化账号（5 个部门管理员 + 5 个部门员工 + 1 个超级管理员）
+-- 全部默认密码均为 123456
+-- 注意：这里不再依赖固定部门 ID，而是按 dept_code 反查，避免插入顺序变化后账号串部门。
+INSERT INTO `sys_user` (`id`, `username`, `password`, `real_name`, `role`, `dept_id`, `status`, `phone`, `email`) VALUES
+(1, 'hr_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '人事管理员', 'admin', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'hr'), 1, '13800138000', 'hr_admin@warehouse.com'),
+(2, 'purchase_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '采购管理员', 'admin', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'purchase'), 1, '13800138001', 'purchase_admin@warehouse.com'),
+(3, 'sales_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '销售管理员', 'admin', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'sales'), 1, '13800138002', 'sales_admin@warehouse.com'),
+(4, 'sales_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '李四', 'employee', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'sales'), 1, '13800138003', 'sales_employee@warehouse.com'),
+(5, 'warehouse_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '仓储管理员', 'admin', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'warehouse'), 1, '13800138004', 'warehouse_admin@warehouse.com'),
+(6, 'finance_admin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '财务管理员', 'admin', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'finance'), 1, '13800138005', 'finance_admin@warehouse.com'),
+(7, 'hr_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '人事员工', 'employee', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'hr'), 1, '13800138006', 'hr_employee@warehouse.com'),
+(8, 'purchase_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '采购员工', 'employee', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'purchase'), 1, '13800138007', 'purchase_employee@warehouse.com'),
+(9, 'warehouse_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '仓储员工', 'employee', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'warehouse'), 1, '13800138008', 'warehouse_employee@warehouse.com'),
+(10, 'finance_employee', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '财务员工', 'employee', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'finance'), 1, '13800138009', 'finance_employee@warehouse.com'),
+(11, 'superadmin', '$2a$10$yxRor5xgip624/ulGHfyxerZlyhK39FpoVlaTIeBmi1DTAGFD6tl6', '超级管理员', 'superadmin', NULL, 1, '13800138010', 'superadmin@warehouse.com');
 
 -- 4.3 初始化员工数据
-INSERT INTO `sys_employee` (`emp_code`, `emp_name`, `dept_id`, `position`, `phone`, `email`) VALUES
-('EMP001', '财务员工', 1, '财务专员', '13800138101', 'finance_employee@warehouse.com'),
-('EMP002', '李四', 2, '销售代表', '13800138102', 'sales_employee@warehouse.com'),
-('EMP003', '仓储员工', 3, '仓管员', '13800138103', 'warehouse_employee@warehouse.com'),
-('EMP004', '采购员工', 4, '采购专员', '13800138104', 'purchase_employee@warehouse.com'),
-('EMP005', '人事员工', 5, '人事专员', '13800138105', 'hr_employee@warehouse.com');
+INSERT INTO `sys_employee` (`user_id`, `emp_code`, `emp_name`, `dept_id`, `position`, `phone`, `email`) VALUES
+((SELECT id FROM `sys_user` WHERE `username` = 'finance_employee'), 'EMP001', '财务员工', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'finance'), '财务专员', '13800138101', 'finance_employee@warehouse.com'),
+((SELECT id FROM `sys_user` WHERE `username` = 'sales_employee'), 'EMP002', '李四', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'sales'), '销售代表', '13800138102', 'sales_employee@warehouse.com'),
+((SELECT id FROM `sys_user` WHERE `username` = 'warehouse_employee'), 'EMP003', '仓储员工', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'warehouse'), '仓管员', '13800138103', 'warehouse_employee@warehouse.com'),
+((SELECT id FROM `sys_user` WHERE `username` = 'purchase_employee'), 'EMP004', '采购员工', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'purchase'), '采购专员', '13800138104', 'purchase_employee@warehouse.com'),
+((SELECT id FROM `sys_user` WHERE `username` = 'hr_employee'), 'EMP005', '人事员工', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'hr'), '人事专员', '13800138105', 'hr_employee@warehouse.com');
 
 -- 4.4 初始化供应商数据
 INSERT INTO `base_supplier` (`supplier_code`, `supplier_name`, `contact_person`, `contact_phone`, `address`, `description`) VALUES
@@ -481,69 +494,149 @@ INSERT INTO `base_supplier` (`supplier_code`, `supplier_name`, `contact_person`,
 ('SUP005', '智能科技股份', '周总', '020-44444444', '广州市天河区科韵路', '智能硬件供应商');
 
 -- 4.5 初始化商品数据
-INSERT INTO `base_goods` (`goods_code`, `goods_name`, `category`, `brand`, `supplier_id`, `purchase_price`, `sale_price`, `stock`, `unit`, `description`) VALUES
-('GD001', '电阻10K', '电子配件', '村田', 4, 0.5, 1.5, 500, '个', '10K欧姆电阻'),
-('GD002', '电容100uF', '电子配件', '村田', 4, 1.0, 2.5, 400, '个', '100微法电容'),
-('GD003', '华为Mate60', '数码产品', '华为', 3, 4500.0, 5999.0, 200, '台', '华为最新旗舰手机'),
-('GD004', '小米14 Pro', '数码产品', '小米', 3, 3800.0, 4999.0, 150, '台', '小米高端手机'),
-('GD005', '联想ThinkPad', '数码产品', '联想', 2, 6000.0, 7500.0, 80, '台', '联想商务笔记本'),
-('GD006', '戴尔显示器', '数码产品', '戴尔', 5, 1200.0, 1699.0, 120, '台', '戴尔27寸显示器'),
-('GD007', '三星24英寸显示器', '数码产品', '三星', 5, 900.0, 1299.0, 100, '台', '三星入门显示器'),
-('GD008', '华为FreeBuds', '数码产品', '华为', 1, 300.0, 499.0, 300, '副', '华为无线耳机'),
-('GD009', '小米AirDots', '数码产品', '小米', 1, 80.0, 129.0, 500, '副', '小米蓝牙耳机'),
-('GD010', '惠普打印机', '办公用品', '惠普', 2, 800.0, 1200.0, 50, '台', '惠普激光打印机'),
-('GD011', '爱普生投影仪', '办公用品', '爱普生', 3, 3500.0, 4500.0, 30, '台', '爱普生商用投影仪'),
-('GD012', '佳能扫描仪', '办公用品', '佳能', 2, 1500.0, 2000.0, 40, '台', '佳能高速扫描仪');
+INSERT INTO `base_goods` (`goods_code`, `goods_name`, `category`, `brand`, `supplier_id`, `purchase_price`, `sale_price`, `stock`, `unit`, `description`)
+SELECT
+    seed.`goods_code`,
+    seed.`goods_name`,
+    seed.`category`,
+    seed.`brand`,
+    supplier.`id`,
+    seed.`purchase_price`,
+    seed.`sale_price`,
+    seed.`stock`,
+    seed.`unit`,
+    seed.`description`
+FROM (
+    SELECT 'GD001' AS `goods_code`, '电阻10K' AS `goods_name`, '电子配件' AS `category`, '村田' AS `brand`, 'SUP004' AS `supplier_code`, 0.5 AS `purchase_price`, 1.5 AS `sale_price`, 500 AS `stock`, '个' AS `unit`, '10K欧姆电阻' AS `description`
+    UNION ALL SELECT 'GD002', '电容100uF', '电子配件', '村田', 'SUP004', 1.0, 2.5, 400, '个', '100微法电容'
+    UNION ALL SELECT 'GD003', '华为Mate60', '数码产品', '华为', 'SUP003', 4500.0, 5999.0, 200, '台', '华为最新旗舰手机'
+    UNION ALL SELECT 'GD004', '小米14 Pro', '数码产品', '小米', 'SUP003', 3800.0, 4999.0, 150, '台', '小米高端手机'
+    UNION ALL SELECT 'GD005', '联想ThinkPad', '数码产品', '联想', 'SUP002', 6000.0, 7500.0, 80, '台', '联想商务笔记本'
+    UNION ALL SELECT 'GD006', '戴尔显示器', '数码产品', '戴尔', 'SUP005', 1200.0, 1699.0, 120, '台', '戴尔27寸显示器'
+    UNION ALL SELECT 'GD007', '三星24英寸显示器', '数码产品', '三星', 'SUP005', 900.0, 1299.0, 100, '台', '三星入门显示器'
+    UNION ALL SELECT 'GD008', '华为FreeBuds', '数码产品', '华为', 'SUP001', 300.0, 499.0, 300, '副', '华为无线耳机'
+    UNION ALL SELECT 'GD009', '小米AirDots', '数码产品', '小米', 'SUP001', 80.0, 129.0, 500, '副', '小米蓝牙耳机'
+    UNION ALL SELECT 'GD010', '惠普打印机', '办公用品', '惠普', 'SUP002', 800.0, 1200.0, 50, '台', '惠普激光打印机'
+    UNION ALL SELECT 'GD011', '爱普生投影仪', '办公用品', '爱普生', 'SUP003', 3500.0, 4500.0, 30, '台', '爱普生商用投影仪'
+    UNION ALL SELECT 'GD012', '佳能扫描仪', '办公用品', '佳能', 'SUP002', 1500.0, 2000.0, 40, '台', '佳能高速扫描仪'
+) AS seed
+JOIN `base_supplier` AS supplier ON supplier.`supplier_code` = seed.`supplier_code`;
 
 -- 4.6 初始化进货记录
-INSERT INTO `biz_purchase` (`purchase_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
-('PUR202501001', 1, '电阻10K', 200, 0.5, 100.00, 1, '系统管理员', '2025-01-05 10:00:00', '首批进货'),
-('PUR202501002', 2, '电容100uF', 150, 1.0, 150.00, 1, '系统管理员', '2025-01-05 10:30:00', '首批进货'),
-('PUR202501003', 3, '华为Mate60', 50, 4500.0, 225000.00, 1, '系统管理员', '2025-01-08 14:00:00', '新品上市'),
-('PUR202501004', 4, '小米14 Pro', 40, 3800.0, 152000.00, 1, '系统管理员', '2025-01-08 14:30:00', '新品上市'),
-('PUR202501005', 5, '联想ThinkPad', 20, 6000.0, 120000.00, 1, '系统管理员', '2025-01-10 09:00:00', '企业采购'),
-('PUR202501006', 6, '戴尔显示器', 30, 1200.0, 36000.00, 1, '系统管理员', '2025-01-10 09:30:00', '办公采购'),
-('PUR202502001', 8, '华为FreeBuds', 100, 300.0, 30000.00, 1, '系统管理员', '2025-02-01 10:00:00', '节前备货'),
-('PUR202502002', 9, '小米AirDots', 150, 80.0, 12000.00, 1, '系统管理员', '2025-02-01 10:30:00', '节前备货'),
-('PUR202502003', 3, '华为Mate60', 30, 4500.0, 135000.00, 1, '系统管理员', '2025-02-05 14:00:00', '补货'),
-('PUR202502004', 4, '小米14 Pro', 25, 3800.0, 95000.00, 1, '系统管理员', '2025-02-05 14:30:00', '补货'),
-('PUR202503001', 10, '惠普打印机', 20, 800.0, 16000.00, 1, '系统管理员', '2025-03-01 09:00:00', '新品采购'),
-('PUR202503002', 11, '爱普生投影仪', 10, 3500.0, 35000.00, 1, '系统管理员', '2025-03-01 09:30:00', '新品采购'),
-('PUR202503003', 12, '佳能扫描仪', 15, 1500.0, 22500.00, 1, '系统管理员', '2025-03-05 10:00:00', '新品采购'),
-('PUR202503004', 1, '电阻10K', 100, 0.5, 50.00, 1, '系统管理员', '2025-03-08 11:00:00', '补货'),
-('PUR202503005', 2, '电容100uF', 100, 1.0, 100.00, 1, '系统管理员', '2025-03-08 11:30:00', '补货');
+INSERT INTO `biz_purchase` (`purchase_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`)
+SELECT
+    seed.`purchase_no`,
+    goods.`id`,
+    goods.`goods_name`,
+    seed.`quantity`,
+    seed.`unit_price`,
+    seed.`total_price`,
+    operator.`id`,
+    seed.`operator_name`,
+    seed.`operation_time`,
+    seed.`remark`
+FROM (
+    SELECT 'PUR202501001' AS `purchase_no`, 'GD001' AS `goods_code`, 200 AS `quantity`, 0.5 AS `unit_price`, 100.00 AS `total_price`, 'superadmin' AS `username`, '系统管理员' AS `operator_name`, '2025-01-05 10:00:00' AS `operation_time`, '首批进货' AS `remark`
+    UNION ALL SELECT 'PUR202501002', 'GD002', 150, 1.0, 150.00, 'superadmin', '系统管理员', '2025-01-05 10:30:00', '首批进货'
+    UNION ALL SELECT 'PUR202501003', 'GD003', 50, 4500.0, 225000.00, 'superadmin', '系统管理员', '2025-01-08 14:00:00', '新品上市'
+    UNION ALL SELECT 'PUR202501004', 'GD004', 40, 3800.0, 152000.00, 'superadmin', '系统管理员', '2025-01-08 14:30:00', '新品上市'
+    UNION ALL SELECT 'PUR202501005', 'GD005', 20, 6000.0, 120000.00, 'superadmin', '系统管理员', '2025-01-10 09:00:00', '企业采购'
+    UNION ALL SELECT 'PUR202501006', 'GD006', 30, 1200.0, 36000.00, 'superadmin', '系统管理员', '2025-01-10 09:30:00', '办公采购'
+    UNION ALL SELECT 'PUR202502001', 'GD008', 100, 300.0, 30000.00, 'superadmin', '系统管理员', '2025-02-01 10:00:00', '节前备货'
+    UNION ALL SELECT 'PUR202502002', 'GD009', 150, 80.0, 12000.00, 'superadmin', '系统管理员', '2025-02-01 10:30:00', '节前备货'
+    UNION ALL SELECT 'PUR202502003', 'GD003', 30, 4500.0, 135000.00, 'superadmin', '系统管理员', '2025-02-05 14:00:00', '补货'
+    UNION ALL SELECT 'PUR202502004', 'GD004', 25, 3800.0, 95000.00, 'superadmin', '系统管理员', '2025-02-05 14:30:00', '补货'
+    UNION ALL SELECT 'PUR202503001', 'GD010', 20, 800.0, 16000.00, 'superadmin', '系统管理员', '2025-03-01 09:00:00', '新品采购'
+    UNION ALL SELECT 'PUR202503002', 'GD011', 10, 3500.0, 35000.00, 'superadmin', '系统管理员', '2025-03-01 09:30:00', '新品采购'
+    UNION ALL SELECT 'PUR202503003', 'GD012', 15, 1500.0, 22500.00, 'superadmin', '系统管理员', '2025-03-05 10:00:00', '新品采购'
+    UNION ALL SELECT 'PUR202503004', 'GD001', 100, 0.5, 50.00, 'superadmin', '系统管理员', '2025-03-08 11:00:00', '补货'
+    UNION ALL SELECT 'PUR202503005', 'GD002', 100, 1.0, 100.00, 'superadmin', '系统管理员', '2025-03-08 11:30:00', '补货'
+) AS seed
+JOIN `base_goods` AS goods ON goods.`goods_code` = seed.`goods_code`
+JOIN `sys_user` AS operator ON operator.`username` = seed.`username`;
 
 -- 4.7 初始化退货记录 (商品退给供应商)
-INSERT INTO `biz_purchase_return` (`return_no`, `source_purchase_id`, `source_purchase_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
-('RET202501001', 1, 'PUR202501001', 1, '电阻10K', 20, 0.5, 10.00, 1, '系统管理员', '2025-01-20 10:00:00', '质量问题退货'),
-('RET202502001', 2, 'PUR202501002', 2, '电容100uF', 15, 1.0, 15.00, 1, '系统管理员', '2025-02-15 10:00:00', '质量问题退货');
+INSERT INTO `biz_purchase_return` (`return_no`, `source_purchase_id`, `source_purchase_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`)
+SELECT
+    seed.`return_no`,
+    source_purchase.`id`,
+    source_purchase.`purchase_no`,
+    goods.`id`,
+    goods.`goods_name`,
+    seed.`quantity`,
+    seed.`unit_price`,
+    seed.`total_price`,
+    operator.`id`,
+    seed.`operator_name`,
+    seed.`operation_time`,
+    seed.`remark`
+FROM (
+    SELECT 'RET202501001' AS `return_no`, 'PUR202501001' AS `source_purchase_no`, 'GD001' AS `goods_code`, 20 AS `quantity`, 0.5 AS `unit_price`, 10.00 AS `total_price`, 'superadmin' AS `username`, '系统管理员' AS `operator_name`, '2025-01-20 10:00:00' AS `operation_time`, '质量问题退货' AS `remark`
+    UNION ALL SELECT 'RET202502001', 'PUR202501002', 'GD002', 15, 1.0, 15.00, 'superadmin', '系统管理员', '2025-02-15 10:00:00', '质量问题退货'
+) AS seed
+JOIN `biz_purchase` AS source_purchase ON source_purchase.`purchase_no` = seed.`source_purchase_no`
+JOIN `base_goods` AS goods ON goods.`goods_code` = seed.`goods_code`
+JOIN `sys_user` AS operator ON operator.`username` = seed.`username`;
 
 -- 4.8 初始化销售记录
-INSERT INTO `biz_sales` (`sales_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
-('SAL202501001', 3, '华为Mate60', 10, 5999.0, 59990.00, 4, '李四', '2025-01-15 10:00:00', '正常销售'),
-('SAL202501002', 4, '小米14 Pro', 8, 4999.0, 39992.00, 4, '李四', '2025-01-15 11:00:00', '正常销售'),
-('SAL202501003', 5, '联想ThinkPad', 5, 7500.0, 37500.00, 4, '李四', '2025-01-16 14:00:00', '企业采购'),
-('SAL202501004', 6, '戴尔显示器', 10, 1699.0, 16990.00, 4, '李四', '2025-01-17 09:00:00', '批量销售'),
-('SAL202501005', 8, '华为FreeBuds', 30, 499.0, 14970.00, 4, '李四', '2025-01-18 10:00:00', '促销活动'),
-('SAL202501006', 9, '小米AirDots', 50, 129.0, 6450.00, 4, '李四', '2025-01-18 11:00:00', '促销活动'),
-('SAL202502001', 3, '华为Mate60', 15, 5999.0, 89985.00, 4, '李四', '2025-02-10 10:00:00', '节后销售'),
-('SAL202502002', 4, '小米14 Pro', 12, 4999.0, 59988.00, 4, '李四', '2025-02-10 11:00:00', '节后销售'),
-('SAL202502003', 6, '戴尔显示器', 8, 1699.0, 13592.00, 4, '李四', '2025-02-12 09:00:00', '正常销售'),
-('SAL202502004', 8, '华为FreeBuds', 40, 499.0, 19960.00, 4, '李四', '2025-02-14 10:00:00', '情人节促销'),
-('SAL202503001', 3, '华为Mate60', 20, 5999.0, 119980.00, 4, '李四', '2025-03-05 10:00:00', '正常销售'),
-('SAL202503002', 4, '小米14 Pro', 18, 4999.0, 89982.00, 4, '李四', '2025-03-05 11:00:00', '正常销售'),
-('SAL202503003', 5, '联想ThinkPad', 8, 7500.0, 60000.00, 4, '李四', '2025-03-06 09:00:00', '企业采购'),
-('SAL202503004', 6, '戴尔显示器', 12, 1699.0, 20388.00, 4, '李四', '2025-03-07 10:00:00', '正常销售'),
-('SAL202503005', 10, '惠普打印机', 5, 1200.0, 6000.00, 4, '李四', '2025-03-08 09:00:00', '新品销售'),
-('SAL202503006', 11, '爱普生投影仪', 3, 4500.0, 13500.00, 4, '李四', '2025-03-08 10:00:00', '新品销售'),
-('SAL202503007', 12, '佳能扫描仪', 4, 2000.0, 8000.00, 4, '李四', '2025-03-09 09:00:00', '新品销售'),
-('SAL202503008', 7, '三星24英寸显示器', 15, 1299.0, 19485.00, 4, '李四', '2025-03-10 10:00:00', '正常销售');
+INSERT INTO `biz_sales` (`sales_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`)
+SELECT
+    seed.`sales_no`,
+    goods.`id`,
+    goods.`goods_name`,
+    seed.`quantity`,
+    seed.`unit_price`,
+    seed.`total_price`,
+    operator.`id`,
+    seed.`operator_name`,
+    seed.`operation_time`,
+    seed.`remark`
+FROM (
+    SELECT 'SAL202501001' AS `sales_no`, 'GD003' AS `goods_code`, 10 AS `quantity`, 5999.0 AS `unit_price`, 59990.00 AS `total_price`, 'sales_employee' AS `username`, '李四' AS `operator_name`, '2025-01-15 10:00:00' AS `operation_time`, '正常销售' AS `remark`
+    UNION ALL SELECT 'SAL202501002', 'GD004', 8, 4999.0, 39992.00, 'sales_employee', '李四', '2025-01-15 11:00:00', '正常销售'
+    UNION ALL SELECT 'SAL202501003', 'GD005', 5, 7500.0, 37500.00, 'sales_employee', '李四', '2025-01-16 14:00:00', '企业采购'
+    UNION ALL SELECT 'SAL202501004', 'GD006', 10, 1699.0, 16990.00, 'sales_employee', '李四', '2025-01-17 09:00:00', '批量销售'
+    UNION ALL SELECT 'SAL202501005', 'GD008', 30, 499.0, 14970.00, 'sales_employee', '李四', '2025-01-18 10:00:00', '促销活动'
+    UNION ALL SELECT 'SAL202501006', 'GD009', 50, 129.0, 6450.00, 'sales_employee', '李四', '2025-01-18 11:00:00', '促销活动'
+    UNION ALL SELECT 'SAL202502001', 'GD003', 15, 5999.0, 89985.00, 'sales_employee', '李四', '2025-02-10 10:00:00', '节后销售'
+    UNION ALL SELECT 'SAL202502002', 'GD004', 12, 4999.0, 59988.00, 'sales_employee', '李四', '2025-02-10 11:00:00', '节后销售'
+    UNION ALL SELECT 'SAL202502003', 'GD006', 8, 1699.0, 13592.00, 'sales_employee', '李四', '2025-02-12 09:00:00', '正常销售'
+    UNION ALL SELECT 'SAL202502004', 'GD008', 40, 499.0, 19960.00, 'sales_employee', '李四', '2025-02-14 10:00:00', '情人节促销'
+    UNION ALL SELECT 'SAL202503001', 'GD003', 20, 5999.0, 119980.00, 'sales_employee', '李四', '2025-03-05 10:00:00', '正常销售'
+    UNION ALL SELECT 'SAL202503002', 'GD004', 18, 4999.0, 89982.00, 'sales_employee', '李四', '2025-03-05 11:00:00', '正常销售'
+    UNION ALL SELECT 'SAL202503003', 'GD005', 8, 7500.0, 60000.00, 'sales_employee', '李四', '2025-03-06 09:00:00', '企业采购'
+    UNION ALL SELECT 'SAL202503004', 'GD006', 12, 1699.0, 20388.00, 'sales_employee', '李四', '2025-03-07 10:00:00', '正常销售'
+    UNION ALL SELECT 'SAL202503005', 'GD010', 5, 1200.0, 6000.00, 'sales_employee', '李四', '2025-03-08 09:00:00', '新品销售'
+    UNION ALL SELECT 'SAL202503006', 'GD011', 3, 4500.0, 13500.00, 'sales_employee', '李四', '2025-03-08 10:00:00', '新品销售'
+    UNION ALL SELECT 'SAL202503007', 'GD012', 4, 2000.0, 8000.00, 'sales_employee', '李四', '2025-03-09 09:00:00', '新品销售'
+    UNION ALL SELECT 'SAL202503008', 'GD007', 15, 1299.0, 19485.00, 'sales_employee', '李四', '2025-03-10 10:00:00', '正常销售'
+) AS seed
+JOIN `base_goods` AS goods ON goods.`goods_code` = seed.`goods_code`
+JOIN `sys_user` AS operator ON operator.`username` = seed.`username`;
 
 -- 4.9 初始化客退记录 (客户退货)
-INSERT INTO `biz_sales_return` (`return_no`, `source_sales_id`, `source_sales_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`) VALUES
-('CSTRET202501001', 1, 'SAL202501001', 3, '华为Mate60', 1, 5999.0, 5999.00, 4, '李四', '2025-01-20 10:00:00', '质量问题退货'),
-('CSTRET202501002', 2, 'SAL202501002', 4, '小米14 Pro', 1, 4999.0, 4999.00, 4, '李四', '2025-01-20 11:00:00', '质量问题退货'),
-('CSTRET202502001', 5, 'SAL202501005', 8, '华为FreeBuds', 2, 499.0, 998.00, 4, '李四', '2025-02-20 10:00:00', '客户退货');
+INSERT INTO `biz_sales_return` (`return_no`, `source_sales_id`, `source_sales_no`, `goods_id`, `goods_name`, `quantity`, `unit_price`, `total_price`, `operator_id`, `operator_name`, `operation_time`, `remark`)
+SELECT
+    seed.`return_no`,
+    source_sales.`id`,
+    source_sales.`sales_no`,
+    goods.`id`,
+    goods.`goods_name`,
+    seed.`quantity`,
+    seed.`unit_price`,
+    seed.`total_price`,
+    operator.`id`,
+    seed.`operator_name`,
+    seed.`operation_time`,
+    seed.`remark`
+FROM (
+    SELECT 'CSTRET202501001' AS `return_no`, 'SAL202501001' AS `source_sales_no`, 'GD003' AS `goods_code`, 1 AS `quantity`, 5999.0 AS `unit_price`, 5999.00 AS `total_price`, 'sales_employee' AS `username`, '李四' AS `operator_name`, '2025-01-20 10:00:00' AS `operation_time`, '质量问题退货' AS `remark`
+    UNION ALL SELECT 'CSTRET202501002', 'SAL202501002', 'GD004', 1, 4999.0, 4999.00, 'sales_employee', '李四', '2025-01-20 11:00:00', '质量问题退货'
+    UNION ALL SELECT 'CSTRET202502001', 'SAL202501005', 'GD008', 2, 499.0, 998.00, 'sales_employee', '李四', '2025-02-20 10:00:00', '客户退货'
+) AS seed
+JOIN `biz_sales` AS source_sales ON source_sales.`sales_no` = seed.`source_sales_no`
+JOIN `base_goods` AS goods ON goods.`goods_code` = seed.`goods_code`
+JOIN `sys_user` AS operator ON operator.`username` = seed.`username`;
 
 -- 4.9.1 初始化成本快照字段（V2.2）
 -- 销售单：按销售时间回溯最近有效进货价，兜底商品进价
@@ -682,7 +775,7 @@ WHERE is_deleted = 0
 INSERT INTO `sys_notice` (`title`, `content`, `target_role`, `target_dept_id`, `publisher`, `publish_time`, `status`) VALUES
 ('管理员月度例会通知', '请各部门管理员于本周五下午参加月度管理例会，汇报本部门重点事项。', 'admin', NULL, '超级管理员', '2025-03-10 10:00:00', 1),
 ('全员制度更新通知', '仓库管理制度已完成统一修订，请全体账号登录后及时查阅并执行。', 'all', NULL, '超级管理员', '2025-03-08 14:00:00', 1),
-('仓储部盘点安排', '仓储部员工请于本周三下班前完成月度盘点，并提交差异说明。', 'employee', 3, '仓储管理员', '2025-03-09 09:30:00', 1);
+('仓储部盘点安排', '仓储部员工请于本周三下班前完成月度盘点，并提交差异说明。', 'employee', (SELECT id FROM `sys_dept` WHERE `dept_code` = 'warehouse'), '仓储管理员', '2025-03-09 09:30:00', 1);
 
 -- =============================================
 -- 五、视图 (便于前端查询)

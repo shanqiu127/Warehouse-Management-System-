@@ -23,6 +23,7 @@ public class AuthzService {
     public static final String DEPT_WAREHOUSE = "warehouse";
     public static final String DEPT_PURCHASE = "purchase";
     public static final String DEPT_HR = "hr";
+    public static final String DEPT_SYSTEM_MANAGEMENT = "system_management";
 
     @Autowired
     private AuthService authService;

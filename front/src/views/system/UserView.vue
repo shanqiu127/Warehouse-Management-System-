@@ -5,7 +5,7 @@
         <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable />
       </el-form-item>
       <el-form-item v-if="isSuperAdminUser" label="角色">
-        <el-select v-model="searchForm.role" clearable placeholder="全部" style="width: 140px;" :disabled="!isSuperAdminUser">
+        <el-select v-model="searchForm.role" placeholder="请选择角色范围" style="width: 180px;" :disabled="!isSuperAdminUser">
           <el-option v-for="item in roleFilterOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
       </el-form-item>
@@ -136,8 +136,9 @@ const deptOptions = ref([])
 const roleFilterOptions = computed(() => (
   isSuperAdminUser.value
     ? [
-        { label: '管理员', value: 'admin' },
-        { label: '普通员工', value: 'employee' }
+        { label: '管理员/超级管理员', value: 'management' },
+        { label: '普通员工', value: 'employee' },
+        { label: '全部', value: 'all' }
       ]
     : [{ label: '普通员工', value: 'employee' }]
 ))
@@ -151,7 +152,7 @@ const formRoleOptions = computed(() => (
     : [{ label: '普通员工', value: 'employee' }]
 ))
 
-const searchForm = reactive({ username: '', role: '', deptId: null, status: null })
+const searchForm = reactive({ username: '', role: 'management', deptId: null, status: null })
 const tableData = ref([])
 const loading = ref(false)
 const currentPage = ref(1)
@@ -197,6 +198,8 @@ const loadDeptOptions = async () => {
     searchForm.role = 'employee'
     searchForm.deptId = userStore.deptId
     form.deptId = userStore.deptId
+  } else {
+    searchForm.role = 'management'
   }
 }
 
@@ -207,7 +210,7 @@ const loadList = async () => {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
       username: searchForm.username || undefined,
-      role: searchForm.role || undefined,
+      role: searchForm.role === 'all' ? undefined : (searchForm.role || undefined),
       deptId: searchForm.deptId || undefined,
       status: !isSuperAdminUser.value && searchForm.status !== null ? searchForm.status : undefined
     }
@@ -232,7 +235,7 @@ const handleSearch = () => {
 
 const resetSearch = () => {
   searchForm.username = ''
-  searchForm.role = isSuperAdminUser.value ? '' : 'employee'
+  searchForm.role = isSuperAdminUser.value ? 'management' : 'employee'
   searchForm.deptId = isSuperAdminUser.value ? null : userStore.deptId
   searchForm.status = null
   currentPage.value = 1
@@ -371,7 +374,7 @@ const handleSave = () => {
       if (res.code !== 200) {
         throw new Error(res.msg || '保存失败')
       }
-      ElMessage.success(form.id ? '修改成功' : '新增成功')
+      ElMessage.success(form.id ? '修改成功' : '新增成功，初始密码为 123456')
       dialogVisible.value = false
       await loadList()
     } catch (error) {

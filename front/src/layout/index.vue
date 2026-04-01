@@ -47,6 +47,7 @@
           <el-menu-item index="/system/notice">公告管理</el-menu-item>
           <el-menu-item index="/system/user">用户管理</el-menu-item>
           <el-menu-item index="/system/super-admin">超管总览</el-menu-item>
+          <el-menu-item index="/system/dept-approval">部门审批</el-menu-item>
         </template>
 
         <el-sub-menu index="/superadmin-audit" v-if="showSuperAdminCenter">
