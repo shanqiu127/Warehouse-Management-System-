@@ -69,6 +69,32 @@ public class NoticeService {
         return toVO(notice, notice.getTargetDeptId() == null ? null : sysDeptMapper.selectById(notice.getTargetDeptId()));
     }
 
+    public List<NoticeVO> listAdminHomeLatest(int limit) {
+        LoginResponse.UserInfoVO currentUser = authzService.currentUser();
+        if (!AuthzService.ROLE_ADMIN.equals(authzService.normalizeRole(currentUser.getRole()))) {
+            throw BusinessException.forbidden("仅管理员首页可查看公告摘要");
+        }
+
+        LambdaQueryWrapper<SysNotice> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(SysNotice::getStatus, 1)
+                .and(group -> group
+                        .eq(SysNotice::getTargetRole, TARGET_ROLE_ALL)
+                        .or(admin -> admin.eq(SysNotice::getTargetRole, TARGET_ROLE_ADMIN)
+                                .and(scope -> scope.isNull(SysNotice::getTargetDeptId)
+                                        .or()
+                                        .eq(SysNotice::getTargetDeptId, currentUser.getDeptId()))))
+                .orderByDesc(SysNotice::getPublishTime)
+                .orderByDesc(SysNotice::getId)
+                .last("LIMIT " + Math.max(limit, 1));
+
+        List<SysNotice> notices = sysNoticeMapper.selectList(wrapper);
+        Map<Long, SysDept> deptMap = buildDeptMap(notices.stream()
+                .map(SysNotice::getTargetDeptId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet()));
+        return notices.stream().map(item -> toVO(item, deptMap.get(item.getTargetDeptId()))).toList();
+    }
+
     public void create(NoticeSaveDTO dto) {
         LoginResponse.UserInfoVO currentUser = authzService.currentUser();
         SysNotice notice = new SysNotice();

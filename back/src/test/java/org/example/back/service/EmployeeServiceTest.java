@@ -38,6 +38,9 @@ class EmployeeServiceTest {
     @Mock
     private AuthzService authzService;
 
+    @Mock
+    private MessageService messageService;
+
     @InjectMocks
     private EmployeeService employeeService;
 
@@ -59,6 +62,7 @@ class EmployeeServiceTest {
 
         when(sysDeptMapper.selectById(2L)).thenReturn(dept);
         when(sysUserMapper.selectCount(any())).thenReturn(0L);
+        when(authzService.currentOperatorLabel()).thenReturn("人事部管理员");
         doAnswer(invocation -> {
             SysUser user = invocation.getArgument(0);
             user.setId(88L);
@@ -85,6 +89,8 @@ class EmployeeServiceTest {
         assertEquals("仓管员", savedEmployee.getPosition());
         assertEquals("13800000001", savedEmployee.getPhone());
         assertEquals("employee_a@test.com", savedEmployee.getEmail());
+
+        verify(messageService, times(1)).sendNewEmployeePasswordReminder("员工甲", 2L, "人事部管理员");
     }
 
     @Test
@@ -125,6 +131,7 @@ class EmployeeServiceTest {
         when(sysUserMapper.selectById(99L)).thenReturn(user);
         when(sysUserMapper.selectCount(any())).thenReturn(0L);
         when(authzService.normalizeRole(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authzService.currentOperatorLabel()).thenReturn("人事部管理员");
 
         employeeService.update(5L, dto);
 
@@ -144,5 +151,26 @@ class EmployeeServiceTest {
         assertEquals(3L, updatedEmployee.getDeptId());
         assertEquals("采购专员", updatedEmployee.getPosition());
         assertEquals(0, updatedEmployee.getStatus());
+
+        verify(messageService, times(1)).sendEmployeeTransferReminders("员工乙-更新", 2L, 3L, "人事部管理员");
+        verify(messageService, times(1)).sendEmployeeLeftReminder("员工乙-更新", 3L, "人事部管理员");
+    }
+
+    @Test
+    void delete_shouldDeleteLinkedUserAndSendReminder() {
+        SysEmployee employee = new SysEmployee();
+        employee.setId(6L);
+        employee.setUserId(101L);
+        employee.setEmpName("员工丙");
+        employee.setDeptId(5L);
+
+        when(sysEmployeeMapper.selectById(6L)).thenReturn(employee);
+        when(authzService.currentOperatorLabel()).thenReturn("人事部管理员");
+
+        employeeService.delete(6L);
+
+        verify(messageService, times(1)).sendEmployeeDeletedReminder("员工丙", 5L, "人事部管理员");
+        verify(sysEmployeeMapper, times(1)).deleteById(6L);
+        verify(sysUserMapper, times(1)).deleteById(101L);
     }
 }

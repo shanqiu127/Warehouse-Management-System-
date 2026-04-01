@@ -53,6 +53,9 @@ public class UserManageService {
     @Autowired
     private AuthzService authzService;
 
+    @Autowired
+    private MessageService messageService;
+
     public PageResult<UserVO> page(UserQueryDTO queryDTO) {
         LoginResponse.UserInfoVO operator = authzService.currentUser();
         String normalizedRoleFilter = authzService.normalizeRole(queryDTO.getRole());
@@ -92,15 +95,18 @@ public class UserManageService {
         LoginResponse.UserInfoVO operator = authzService.currentUser();
         validateRoleForManage(dto.getRole());
         rejectSuperadminCreate(dto.getRole());
-        Long deptId = validateAndResolveDeptId(dto.getRole(), dto.getDeptId(), operator);
+        SysDept dept = validateAndResolveDept(dto.getRole(), dto.getDeptId(), operator);
         checkUsernameUnique(dto.getUsername(), null);
         SysUser user = new SysUser();
         BeanUtils.copyProperties(dto, user);
-        user.setDeptId(deptId);
+        user.setDeptId(dept == null ? null : dept.getId());
         user.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         user.setPassword(BCrypt.hashpw(DEFAULT_PASSWORD));
         sysUserMapper.insert(user);
         syncEmployeeProfileForManagedUser(user, null);
+        if (shouldNotifyManagedEmployee(user)) {
+            messageService.sendNewEmployeePasswordReminder(user.getRealName(), user.getDeptId(), authzService.currentOperatorLabel());
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -108,19 +114,29 @@ public class UserManageService {
         LoginResponse.UserInfoVO operator = authzService.currentUser();
         SysUser user = requireManageableUser(id);
         String oldRole = authzService.normalizeRole(user.getRole());
+        Long oldDeptId = user.getDeptId();
+        Integer oldStatus = user.getStatus();
         validateRoleForManage(dto.getRole());
         validateSuperadminRoleChange(user.getRole(), dto.getRole());
-        Long deptId = validateAndResolveDeptId(dto.getRole(), dto.getDeptId(), operator);
+        SysDept dept = validateAndResolveDept(dto.getRole(), dto.getDeptId(), operator);
         checkUsernameUnique(dto.getUsername(), id);
         user.setUsername(dto.getUsername());
         user.setRealName(dto.getRealName());
         user.setRole(dto.getRole());
-        user.setDeptId(deptId);
+        user.setDeptId(dept == null ? null : dept.getId());
         user.setStatus(dto.getStatus() == null ? user.getStatus() : dto.getStatus());
         user.setPhone(dto.getPhone());
         user.setEmail(dto.getEmail());
         sysUserMapper.updateById(user);
         syncEmployeeProfileForManagedUser(user, oldRole);
+
+        String newRole = authzService.normalizeRole(user.getRole());
+        if (shouldNotifyManagedEmployee(user) && ROLE_EMPLOYEE.equals(oldRole) && ROLE_EMPLOYEE.equals(newRole) && oldDeptId != null && !oldDeptId.equals(user.getDeptId())) {
+            messageService.sendEmployeeTransferReminders(user.getRealName(), oldDeptId, user.getDeptId(), authzService.currentOperatorLabel());
+        }
+        if (authzService.isSuperAdmin() && ROLE_EMPLOYEE.equals(newRole) && !Integer.valueOf(0).equals(oldStatus) && Integer.valueOf(0).equals(user.getStatus())) {
+            messageService.sendEmployeeDisabledReminder(user.getRealName(), user.getDeptId(), authzService.currentOperatorLabel());
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -129,6 +145,7 @@ public class UserManageService {
             throw BusinessException.validateFail("用户状态只能为 0 或 1");
         }
         SysUser user = requireManageableUser(id);
+        Integer oldStatus = user.getStatus();
         if (ROLE_SUPERADMIN.equals(user.getRole())) {
             throw BusinessException.validateFail("超级管理员状态不允许修改");
         }
@@ -136,6 +153,9 @@ public class UserManageService {
         sysUserMapper.updateById(user);
         if (ROLE_EMPLOYEE.equals(authzService.normalizeRole(user.getRole()))) {
             syncEmployeeProfileForManagedUser(user, user.getRole());
+            if (authzService.isSuperAdmin() && !Integer.valueOf(0).equals(oldStatus) && Integer.valueOf(0).equals(status)) {
+                messageService.sendEmployeeDisabledReminder(user.getRealName(), user.getDeptId(), authzService.currentOperatorLabel());
+            }
         }
     }
 
@@ -145,10 +165,14 @@ public class UserManageService {
         if (ROLE_SUPERADMIN.equals(user.getRole())) {
             throw BusinessException.validateFail("超级管理员账号不允许删除");
         }
+        boolean employeeUser = ROLE_EMPLOYEE.equals(authzService.normalizeRole(user.getRole()));
         if (ROLE_EMPLOYEE.equals(authzService.normalizeRole(user.getRole()))) {
             deleteEmployeeProfileByUserId(user.getId());
         }
         sysUserMapper.deleteById(id);
+        if (employeeUser && authzService.isSuperAdmin()) {
+            messageService.sendEmployeeDeletedReminder(user.getRealName(), user.getDeptId(), authzService.currentOperatorLabel());
+        }
     }
 
     public void resetPassword(Long targetUserId, String newPassword) {
@@ -174,6 +198,9 @@ public class UserManageService {
 
         targetUser.setPassword(BCrypt.hashpw(newPassword));
         sysUserMapper.updateById(targetUser);
+        if (shouldNotifyManagedEmployee(targetUser)) {
+            messageService.sendEmployeePasswordChangedReminder(targetUser.getRealName(), targetUser.getDeptId(), authzService.currentOperatorLabel());
+        }
     }
 
     private SysUser requireCurrentUser() {
@@ -200,13 +227,17 @@ public class UserManageService {
         }
     }
 
-    private Long validateAndResolveDeptId(String targetRole, Long deptId, LoginResponse.UserInfoVO operator) {
+    private SysDept validateAndResolveDept(String targetRole, Long deptId, LoginResponse.UserInfoVO operator) {
         String normalizedRole = authzService.normalizeRole(targetRole);
         if (ROLE_SUPERADMIN.equals(normalizedRole)) {
             return null;
         }
 
         SysDept dept = authzService.requireDept(deptId);
+        if (ROLE_EMPLOYEE.equals(normalizedRole)
+                && AuthzService.DEPT_SYSTEM_MANAGEMENT.equals(authzService.normalizeDeptCode(dept.getDeptCode()))) {
+            throw BusinessException.validateFail("系统管理部不允许维护普通员工账号");
+        }
         if (authzService.isAdmin()) {
             if (!ROLE_EMPLOYEE.equals(normalizedRole)) {
                 throw BusinessException.forbidden("部门管理员仅可创建或维护本部门员工账号");
@@ -215,7 +246,7 @@ public class UserManageService {
                 throw BusinessException.forbidden("部门管理员仅可操作本部门员工账号");
             }
         }
-        return dept.getId();
+        return dept;
     }
 
     private void rejectSuperadminCreate(String role) {
@@ -258,6 +289,11 @@ public class UserManageService {
             throw BusinessException.forbidden("部门管理员仅可操作本部门员工账号");
         }
         authzService.requireCurrentDept(user.getDeptId(), "部门管理员仅可操作本部门员工账号");
+    }
+
+    private boolean shouldNotifyManagedEmployee(SysUser user) {
+        String role = authzService.normalizeRole(user.getRole());
+        return ROLE_EMPLOYEE.equals(role) && (authzService.isSuperAdmin() || authzService.isHrAdmin());
     }
 
     private void syncEmployeeProfileForManagedUser(SysUser user, String oldRole) {

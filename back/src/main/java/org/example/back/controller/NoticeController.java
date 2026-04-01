@@ -12,6 +12,8 @@ import org.example.back.vo.NoticeVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/system/notices")
 public class NoticeController {
@@ -27,6 +29,11 @@ public class NoticeController {
     @GetMapping("/{id}")
     public Result<NoticeVO> getById(@PathVariable Long id) {
         return Result.success(noticeService.getById(id));
+    }
+
+    @GetMapping("/home/latest")
+    public Result<List<NoticeVO>> homeLatest(@RequestParam(defaultValue = "4") Integer limit) {
+        return Result.success(noticeService.listAdminHomeLatest(limit == null ? 4 : limit));
     }
 
     @PostMapping

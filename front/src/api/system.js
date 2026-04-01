@@ -2,6 +2,7 @@ import request from '@/utils/request'
 
 export const getNoticePageAPI = (params) => request.get('/system/notices/page', { params })
 export const getNoticeDetailAPI = (id) => request.get(`/system/notices/${id}`)
+export const getAdminHomeLatestNoticeAPI = (limit = 4) => request.get('/system/notices/home/latest', { params: { limit } })
 export const createNoticeAPI = (data) => request.post('/system/notices', data)
 export const updateNoticeAPI = (id, data) => request.put(`/system/notices/${id}`, data)
 export const deleteNoticeAPI = (id) => request.delete(`/system/notices/${id}`)

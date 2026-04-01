@@ -78,6 +78,10 @@ public class AuthzService {
         return isAdmin() && normalizeDeptCode(deptCode).equals(currentDeptCode());
     }
 
+    public boolean isHrAdmin() {
+        return isDeptAdmin(DEPT_HR);
+    }
+
     public boolean hasDeptAdminOrSuperAdminAccess(String deptCode) {
         return isSuperAdmin() || isDeptAdmin(deptCode);
     }
@@ -96,6 +100,12 @@ public class AuthzService {
 
     public void requireCurrentDept(Long targetDeptId, String message) {
         if (!hasDeptAccess(targetDeptId)) {
+            throw BusinessException.forbidden(message);
+        }
+    }
+
+    public void requireDeptAdmin(String deptCode, String message) {
+        if (!isDeptAdmin(deptCode)) {
             throw BusinessException.forbidden(message);
         }
     }
@@ -144,5 +154,21 @@ public class AuthzService {
             return "";
         }
         return deptCode.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public String currentOperatorLabel() {
+        LoginResponse.UserInfoVO userInfo = currentUser();
+        String role = normalizeRole(userInfo.getRole());
+        String deptCode = normalizeDeptCode(userInfo.getDeptCode());
+        if (ROLE_SUPERADMIN.equals(role)) {
+            return "超级管理员";
+        }
+        if (ROLE_ADMIN.equals(role) && DEPT_HR.equals(deptCode)) {
+            return "人事部管理员";
+        }
+        if (ROLE_ADMIN.equals(role)) {
+            return StringUtils.hasText(userInfo.getDeptName()) ? userInfo.getDeptName() + "管理员" : "部门管理员";
+        }
+        return StringUtils.hasText(userInfo.getRealName()) ? userInfo.getRealName() : "系统";
     }
 }

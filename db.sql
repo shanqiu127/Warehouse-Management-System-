@@ -116,6 +116,24 @@ CREATE TABLE `sys_notice` (
     KEY `idx_is_deleted` (`is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告表';
 
+DROP TABLE IF EXISTS `sys_message`;
+CREATE TABLE `sys_message` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `recipient_user_id` BIGINT NOT NULL COMMENT '接收人用户ID',
+    `recipient_dept_id` BIGINT DEFAULT NULL COMMENT '接收人所属部门ID',
+    `title` VARCHAR(120) NOT NULL COMMENT '消息标题',
+    `content` TEXT NOT NULL COMMENT '消息正文',
+    `is_read` TINYINT NOT NULL DEFAULT 0 COMMENT '是否已读: 0-未读, 1-已读',
+    `read_time` DATETIME DEFAULT NULL COMMENT '已读时间',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_recipient_user_read` (`recipient_user_id`, `is_read`, `create_time`),
+    KEY `idx_recipient_dept` (`recipient_dept_id`),
+    KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='站内消息表';
+
 DROP TABLE IF EXISTS `sys_error_log`;
 CREATE TABLE `sys_error_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',

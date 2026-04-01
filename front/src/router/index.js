@@ -112,6 +112,12 @@ const router = createRouter({
           meta: { roles: ['admin'], deptCodes: ['hr'] }
         },
         {
+          path: "system/hr-chart",
+          name: "SystemHrChart",
+          component: () => import("../views/system/HrChartView.vue"),
+          meta: { roles: ['admin'], deptCodes: ['hr'] }
+        },
+        {
           path: "system/void-approval",
           name: "SystemVoidApproval",
           component: () => import("../views/system/VoidApprovalView.vue"),

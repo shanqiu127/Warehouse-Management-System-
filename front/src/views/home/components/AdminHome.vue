@@ -71,7 +71,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
-import { getNoticeDetailAPI, getNoticePageAPI } from '@/api/system'
+import { getAdminHomeLatestNoticeAPI, getNoticeDetailAPI } from '@/api/system'
 import { useUserStore } from '@/stores/user'
 import { normalizeDeptCode } from '@/utils/auth'
 
@@ -152,7 +152,8 @@ const quickActions = computed(() => {
     ],
     hr: [
       { path: '/system/dept', title: '全部门管理', description: '维护部门资料与负责人信息' },
-      { path: '/system/employee', title: '全员工管理', description: '维护跨部门员工档案资料' }
+      { path: '/system/employee', title: '全员工管理', description: '维护跨部门员工档案资料' },
+      { path: '/system/hr-chart', title: '员工分布图表', description: '查看在职员工分布与部门人口构成' }
     ]
   }
 
@@ -189,9 +190,9 @@ const loadSummary = async () => {
 const loadNotices = async () => {
   noticeLoading.value = true
   try {
-    const res = await getNoticePageAPI({ pageNum: 1, pageSize: 4, status: 1 })
+    const res = await getAdminHomeLatestNoticeAPI(4)
     if (res.code === 200) {
-      noticeList.value = res.data?.records || []
+      noticeList.value = res.data || []
     }
   } catch {
     ElMessage.error('公告加载失败')

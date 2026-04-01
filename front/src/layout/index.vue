@@ -8,6 +8,7 @@
         <template v-if="isHrAdmin">
           <el-menu-item index="/system/dept">全部门管理</el-menu-item>
           <el-menu-item index="/system/employee">全员工管理</el-menu-item>
+          <el-menu-item index="/system/hr-chart">员工分布图表</el-menu-item>
           <el-menu-item index="/system/notice">公告管理</el-menu-item>
           <el-menu-item index="/system/user">用户部门管理</el-menu-item>
         </template>
@@ -61,7 +62,8 @@
     <el-container>
       <el-header style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eaeaea;">
         <div style="font-weight: bold;">后台数据管理系统</div>
-        <div>
+        <div class="header-actions">
+          <MessageCenter />
           <el-button type="danger" text @click="handleLogout">退出登录</el-button>
         </div>
       </el-header>
@@ -75,6 +77,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { computed } from 'vue'
+import MessageCenter from '@/components/MessageCenter.vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { isAdminRole, isSuperAdmin, normalizeDeptCode } from '@/utils/auth'
@@ -108,6 +111,13 @@ const handleLogout = async () => {
 .layout-container {
   height: 100vh;
 }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .el-menu {
   border-right: none;
 }

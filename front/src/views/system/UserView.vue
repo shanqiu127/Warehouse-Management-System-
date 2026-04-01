@@ -9,8 +9,8 @@
           <el-option v-for="item in roleFilterOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
       </el-form-item>
-      <el-form-item v-if="isSuperAdminUser" label="所属部门">
-        <el-select v-model="searchForm.deptId" clearable placeholder="全部" style="width: 160px;" :disabled="!isSuperAdminUser">
+      <el-form-item v-if="canChooseDept" label="所属部门">
+        <el-select v-model="searchForm.deptId" clearable placeholder="全部" style="width: 180px;">
           <el-option v-for="dept in deptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
         </el-select>
       </el-form-item>
@@ -31,7 +31,7 @@
       <el-table-column type="index" label="序号" width="60" />
       <el-table-column prop="username" label="用户名" min-width="120" />
       <el-table-column prop="realName" label="真实姓名" min-width="120" />
-      <el-table-column v-if="isSuperAdminUser" prop="deptName" label="所属部门" min-width="120" />
+      <el-table-column v-if="showDeptColumn" prop="deptName" label="所属部门" min-width="120" />
       <el-table-column v-if="isSuperAdminUser" prop="role" label="角色" width="120">
         <template #default="scope">
           <el-tag :type="scope.row.role === 'superadmin' ? 'danger' : (scope.row.role === 'admin' ? 'warning' : 'info')">
@@ -82,12 +82,12 @@
           <el-input v-model="form.realName" />
         </el-form-item>
         <el-form-item v-if="isSuperAdminUser" label="角色" prop="role">
-          <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;" :disabled="!isSuperAdminUser">
+          <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;">
             <el-option v-for="item in formRoleOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="isSuperAdminUser" label="所属部门" prop="deptId">
-          <el-select v-model="form.deptId" placeholder="请选择所属部门" style="width: 100%;" :disabled="!isSuperAdminUser">
+        <el-form-item v-if="canChooseDept" label="所属部门" prop="deptId">
+          <el-select v-model="form.deptId" placeholder="请选择所属部门" style="width: 100%;">
             <el-option v-for="dept in deptOptions" :key="dept.id" :label="dept.name" :value="dept.id" />
           </el-select>
         </el-form-item>
@@ -131,6 +131,8 @@ import {
 const userStore = useUserStore()
 
 const isSuperAdminUser = computed(() => isSuperAdmin(userStore.role))
+const canChooseDept = computed(() => isSuperAdminUser.value)
+const showDeptColumn = computed(() => isSuperAdminUser.value)
 const deptOptions = ref([])
 
 const roleFilterOptions = computed(() => (
@@ -182,7 +184,7 @@ const resetForm = () => {
   form.username = ''
   form.realName = ''
   form.role = 'employee'
-  form.deptId = isSuperAdminUser.value ? null : userStore.deptId
+  form.deptId = canChooseDept.value ? null : userStore.deptId
   form.status = true
   form.phone = ''
   form.email = ''
@@ -194,13 +196,13 @@ const loadDeptOptions = async () => {
     throw new Error(res.msg || '部门下拉加载失败')
   }
   deptOptions.value = res.data || []
-  if (!isSuperAdminUser.value) {
-    searchForm.role = 'employee'
-    searchForm.deptId = userStore.deptId
-    form.deptId = userStore.deptId
-  } else {
+  if (isSuperAdminUser.value) {
     searchForm.role = 'management'
+    searchForm.deptId = null
+    return
   }
+  searchForm.role = 'employee'
+  searchForm.deptId = canChooseDept.value ? null : userStore.deptId
 }
 
 const loadList = async () => {
@@ -210,8 +212,8 @@ const loadList = async () => {
       pageNum: currentPage.value,
       pageSize: pageSize.value,
       username: searchForm.username || undefined,
-      role: searchForm.role === 'all' ? undefined : (searchForm.role || undefined),
-      deptId: searchForm.deptId || undefined,
+      role: isSuperAdminUser.value ? (searchForm.role === 'all' ? undefined : (searchForm.role || undefined)) : 'employee',
+      deptId: canChooseDept.value ? (searchForm.deptId || undefined) : (userStore.deptId || undefined),
       status: !isSuperAdminUser.value && searchForm.status !== null ? searchForm.status : undefined
     }
     const res = await getUserPageAPI(params)
@@ -236,7 +238,7 @@ const handleSearch = () => {
 const resetSearch = () => {
   searchForm.username = ''
   searchForm.role = isSuperAdminUser.value ? 'management' : 'employee'
-  searchForm.deptId = isSuperAdminUser.value ? null : userStore.deptId
+  searchForm.deptId = canChooseDept.value ? null : userStore.deptId
   searchForm.status = null
   currentPage.value = 1
   loadList()
@@ -283,7 +285,7 @@ const handleEdit = async (row) => {
       username: detail.username || '',
       realName: detail.realName || '',
       role: detail.role || 'employee',
-      deptId: detail.deptId || (isSuperAdminUser.value ? null : userStore.deptId),
+      deptId: detail.deptId || (canChooseDept.value ? null : userStore.deptId),
       status: !!detail.status,
       phone: detail.phone || '',
       email: detail.email || ''
@@ -365,7 +367,7 @@ const handleSave = () => {
         username: form.username,
         realName: form.realName,
         role: isSuperAdminUser.value ? form.role : 'employee',
-        deptId: isSuperAdminUser.value ? form.deptId : userStore.deptId,
+        deptId: canChooseDept.value ? form.deptId : userStore.deptId,
         status: form.status ? 1 : 0,
         phone: form.phone || '',
         email: form.email || ''
@@ -385,8 +387,8 @@ const handleSave = () => {
 
 onMounted(async () => {
   try {
-    resetForm()
     await loadDeptOptions()
+    resetForm()
     await loadList()
   } catch (error) {
     ElMessage.error(error.message || '初始化失败')

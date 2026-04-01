@@ -54,6 +54,9 @@ public class EmployeeService {
     @Autowired
     private AuthzService authzService;
 
+    @Autowired
+    private MessageService messageService;
+
     private void requireEmployeeModuleAccess() {
         authzService.requireDeptAdminOrSuperAdmin(AuthzService.DEPT_HR, "仅人事部门管理员可访问员工档案");
     }
@@ -113,6 +116,7 @@ public class EmployeeService {
         SysUser user = buildEmployeeUser(dto, dept, dto.getStatus() == null ? 1 : dto.getStatus());
         sysUserMapper.insert(user);
         sysEmployeeMapper.insert(buildEmployeeProfile(user, dto.getPosition()));
+        messageService.sendNewEmployeePasswordReminder(user.getRealName(), dept.getId(), authzService.currentOperatorLabel());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -121,6 +125,8 @@ public class EmployeeService {
         assertEditableEmployeeId(id);
         SysDept dept = requireEditableDept(dto.getDeptId());
         SysEmployee employee = requireEmployee(id);
+        Long previousDeptId = employee.getDeptId();
+        Integer previousStatus = employee.getStatus();
         SysUser user = resolveLinkedUserForUpdate(employee, dto, dept);
         validateUsernameUnique(dto.getUsername(), user.getId());
         assertEmployeeUser(user);
@@ -136,6 +142,13 @@ public class EmployeeService {
         employee.setEmail(user.getEmail());
         employee.setStatus(user.getStatus());
         sysEmployeeMapper.updateById(employee);
+
+        if (previousDeptId != null && !previousDeptId.equals(employee.getDeptId())) {
+            messageService.sendEmployeeTransferReminders(user.getRealName(), previousDeptId, employee.getDeptId(), authzService.currentOperatorLabel());
+        }
+        if (!Integer.valueOf(0).equals(previousStatus) && Integer.valueOf(0).equals(employee.getStatus())) {
+            messageService.sendEmployeeLeftReminder(user.getRealName(), employee.getDeptId(), authzService.currentOperatorLabel());
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -144,6 +157,7 @@ public class EmployeeService {
         assertEditableEmployeeId(id);
         SysEmployee employee = requireEmployee(id);
         Long userId = employee.getUserId();
+        messageService.sendEmployeeDeletedReminder(employee.getEmpName(), employee.getDeptId(), authzService.currentOperatorLabel());
         sysEmployeeMapper.deleteById(id);
         if (userId != null) {
             sysUserMapper.deleteById(userId);
