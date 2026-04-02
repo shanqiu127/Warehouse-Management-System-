@@ -19,9 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,6 +46,9 @@ public class NoticeService {
 
     public PageResult<NoticeVO> page(NoticeQueryDTO queryDTO) {
         LoginResponse.UserInfoVO currentUser = authzService.currentUser();
+        if (currentUser == null) {
+            throw BusinessException.unauthorized("用户未登录，请先登录");
+        }
         LambdaQueryWrapper<SysNotice> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(queryDTO.getTitle()), SysNotice::getTitle, queryDTO.getTitle())
                 .eq(StringUtils.hasText(queryDTO.getTargetRole()), SysNotice::getTargetRole, normalizeTargetRole(queryDTO.getTargetRole()))
@@ -55,11 +60,16 @@ public class NoticeService {
         applyVisibilityFilter(wrapper, currentUser);
 
         Page<SysNotice> page = sysNoticeMapper.selectPage(new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize()), wrapper);
-        Map<Long, SysDept> deptMap = buildDeptMap(page.getRecords().stream()
+        List<SysNotice> noticeRecords = page.getRecords() == null
+                ? List.of()
+                : page.getRecords().stream().filter(Objects::nonNull).toList();
+        Map<Long, SysDept> deptMap = buildDeptMap(noticeRecords.stream()
                 .map(SysNotice::getTargetDeptId)
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet()));
-        List<NoticeVO> records = page.getRecords().stream().map(item -> toVO(item, deptMap.get(item.getTargetDeptId()))).toList();
+        List<NoticeVO> records = noticeRecords.stream()
+                .map(item -> toVO(item, item.getTargetDeptId() == null ? null : deptMap.get(item.getTargetDeptId())))
+                .toList();
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
@@ -92,7 +102,9 @@ public class NoticeService {
                 .map(SysNotice::getTargetDeptId)
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toSet()));
-        return notices.stream().map(item -> toVO(item, deptMap.get(item.getTargetDeptId()))).toList();
+        return notices.stream()
+            .map(item -> toVO(item, item.getTargetDeptId() == null ? null : deptMap.get(item.getTargetDeptId())))
+            .toList();
     }
 
     public void create(NoticeSaveDTO dto) {
@@ -136,27 +148,39 @@ public class NoticeService {
     }
 
     private void applyVisibilityFilter(LambdaQueryWrapper<SysNotice> wrapper, LoginResponse.UserInfoVO currentUser) {
+        if (currentUser == null) {
+            throw BusinessException.unauthorized("用户未登录，请先登录");
+        }
         String role = authzService.normalizeRole(currentUser.getRole());
         Long deptId = currentUser.getDeptId();
         if (AuthzService.ROLE_SUPERADMIN.equals(role)) {
             return;
         }
         if (AuthzService.ROLE_ADMIN.equals(role)) {
-            wrapper.and(group -> group
-                    .eq(SysNotice::getTargetRole, TARGET_ROLE_ALL)
-                    .or(admin -> admin.eq(SysNotice::getTargetRole, TARGET_ROLE_ADMIN)
-                            .and(scope -> scope.isNull(SysNotice::getTargetDeptId)
-                                    .or()
-                                    .eq(SysNotice::getTargetDeptId, deptId)))
-                    .or(employee -> employee.eq(SysNotice::getTargetRole, TARGET_ROLE_EMPLOYEE)
-                            .eq(SysNotice::getTargetDeptId, deptId)));
+            wrapper.and(group -> {
+                group.eq(SysNotice::getTargetRole, TARGET_ROLE_ALL)
+                        .or(admin -> admin.eq(SysNotice::getTargetRole, TARGET_ROLE_ADMIN)
+                                .and(scope -> {
+                                    scope.isNull(SysNotice::getTargetDeptId);
+                                    if (deptId != null) {
+                                        scope.or().eq(SysNotice::getTargetDeptId, deptId);
+                                    }
+                                }));
+                if (deptId != null) {
+                    group.or(employee -> employee.eq(SysNotice::getTargetRole, TARGET_ROLE_EMPLOYEE)
+                            .eq(SysNotice::getTargetDeptId, deptId));
+                }
+            });
             return;
         }
         wrapper.eq(SysNotice::getStatus, 1)
-                .and(group -> group
-                        .eq(SysNotice::getTargetRole, TARGET_ROLE_ALL)
-                        .or(employee -> employee.eq(SysNotice::getTargetRole, TARGET_ROLE_EMPLOYEE)
-                                .eq(SysNotice::getTargetDeptId, deptId)));
+                .and(group -> {
+                    group.eq(SysNotice::getTargetRole, TARGET_ROLE_ALL);
+                    if (deptId != null) {
+                        group.or(employee -> employee.eq(SysNotice::getTargetRole, TARGET_ROLE_EMPLOYEE)
+                                .eq(SysNotice::getTargetDeptId, deptId));
+                    }
+                });
     }
 
     private void applyAudience(SysNotice notice, NoticeSaveDTO dto, LoginResponse.UserInfoVO currentUser) {
@@ -189,43 +213,50 @@ public class NoticeService {
     }
 
     private void ensureCanView(SysNotice notice, LoginResponse.UserInfoVO currentUser) {
+        if (notice == null) {
+            throw BusinessException.notFound("公告不存在");
+        }
         String role = authzService.normalizeRole(currentUser.getRole());
+        String targetRole = normalizeTargetRole(notice.getTargetRole());
         if (AuthzService.ROLE_SUPERADMIN.equals(role)) {
             return;
         }
         if (AuthzService.ROLE_ADMIN.equals(role)) {
-            if (TARGET_ROLE_ALL.equals(notice.getTargetRole())) {
+            if (TARGET_ROLE_ALL.equals(targetRole)) {
                 return;
             }
-            if (TARGET_ROLE_ADMIN.equals(notice.getTargetRole())) {
+            if (TARGET_ROLE_ADMIN.equals(targetRole)) {
                 if (notice.getTargetDeptId() == null || authzService.hasDeptAccess(notice.getTargetDeptId())) {
                     return;
                 }
             }
-            if (TARGET_ROLE_EMPLOYEE.equals(notice.getTargetRole()) && authzService.hasDeptAccess(notice.getTargetDeptId())) {
+            if (TARGET_ROLE_EMPLOYEE.equals(targetRole) && authzService.hasDeptAccess(notice.getTargetDeptId())) {
                 return;
             }
             throw BusinessException.forbidden("无权限查看该公告");
         }
-        if (notice.getStatus() != 1) {
+        if (!Integer.valueOf(1).equals(notice.getStatus())) {
             throw BusinessException.forbidden("无权限查看该公告");
         }
-        if (TARGET_ROLE_ALL.equals(notice.getTargetRole())) {
+        if (TARGET_ROLE_ALL.equals(targetRole)) {
             return;
         }
-        if (TARGET_ROLE_EMPLOYEE.equals(notice.getTargetRole()) && authzService.hasDeptAccess(notice.getTargetDeptId())) {
+        if (TARGET_ROLE_EMPLOYEE.equals(targetRole) && authzService.hasDeptAccess(notice.getTargetDeptId())) {
             return;
         }
         throw BusinessException.forbidden("无权限查看该公告");
     }
 
     private void ensureCanManage(SysNotice notice, LoginResponse.UserInfoVO currentUser) {
+        if (notice == null) {
+            throw BusinessException.notFound("公告不存在");
+        }
         String role = authzService.normalizeRole(currentUser.getRole());
         if (AuthzService.ROLE_SUPERADMIN.equals(role)) {
             return;
         }
         if (AuthzService.ROLE_ADMIN.equals(role)
-                && TARGET_ROLE_EMPLOYEE.equals(notice.getTargetRole())
+                && TARGET_ROLE_EMPLOYEE.equals(normalizeTargetRole(notice.getTargetRole()))
                 && authzService.hasDeptAccess(notice.getTargetDeptId())) {
             return;
         }
@@ -234,7 +265,7 @@ public class NoticeService {
 
     private Map<Long, SysDept> buildDeptMap(Set<Long> deptIds) {
         if (deptIds.isEmpty()) {
-            return Map.of();
+            return Collections.emptyMap();
         }
         LambdaQueryWrapper<SysDept> wrapper = new LambdaQueryWrapper<>();
         wrapper.in(SysDept::getId, deptIds);

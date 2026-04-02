@@ -1,6 +1,6 @@
 <template>
   <el-container class="layout-container">
-    <el-aside width="200px" style="background-color: #304156; color: white;">
+    <el-aside v-if="showSidebar" width="200px" style="background-color: #304156; color: white;">
       <h3 style="text-align: center; color: white; padding: 15px 0; margin: 0;">仓库管理系统</h3>
       <el-menu background-color="#304156" text-color="#fff" router :default-active="$route.path">
         <el-menu-item index="/home">首页</el-menu-item>
@@ -59,7 +59,7 @@
         </el-sub-menu>
       </el-menu>
     </el-aside>
-    <el-container>
+    <el-container class="content-container">
       <el-header style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eaeaea;">
         <div style="font-weight: bold;">后台数据管理系统</div>
         <div class="header-actions">
@@ -80,7 +80,7 @@ import { computed } from 'vue'
 import MessageCenter from '@/components/MessageCenter.vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { isAdminRole, isSuperAdmin, normalizeDeptCode } from '@/utils/auth'
+import { isAdminRole, isEmployeeRole, isSuperAdmin, normalizeDeptCode } from '@/utils/auth'
 import { logoutAPI } from '@/api/user'
 
 const router = useRouter()
@@ -88,6 +88,8 @@ const userStore = useUserStore()
 
 const currentDeptCode = computed(() => normalizeDeptCode(userStore.deptCode))
 const isDeptAdminRole = computed(() => isAdminRole(userStore.role))
+const isEmployee = computed(() => isEmployeeRole(userStore.role))
+const showSidebar = computed(() => !isEmployee.value)
 const showSuperAdminCenter = computed(() => isSuperAdmin(userStore.role))
 const isFinanceAdmin = computed(() => isDeptAdminRole.value && currentDeptCode.value === 'finance')
 const isSalesAdmin = computed(() => isDeptAdminRole.value && currentDeptCode.value === 'sales')
@@ -110,6 +112,10 @@ const handleLogout = async () => {
 <style scoped>
 .layout-container {
   height: 100vh;
+}
+
+.content-container {
+  min-width: 0;
 }
 
 .header-actions {
