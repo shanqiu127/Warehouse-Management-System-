@@ -64,11 +64,10 @@ import {
   markMessageReadAPI
 } from '@/api/message'
 import { useUserStore } from '@/stores/user'
-import { isAdminRole } from '@/utils/auth'
 
 const userStore = useUserStore()
 
-const showMessageCenter = computed(() => isAdminRole(userStore.role))
+const showMessageCenter = computed(() => Boolean(userStore.token))
 const unreadCount = ref(0)
 const drawerVisible = ref(false)
 const listLoading = ref(false)

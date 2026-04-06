@@ -22,6 +22,7 @@ import org.example.back.mapper.BizPurchaseReturnMapper;
 import org.example.back.mapper.BizSalesMapper;
 import org.example.back.mapper.BizSalesReturnMapper;
 import org.example.back.vo.ApprovalOrderVO;
+import org.example.back.vo.ReminderSummaryVO;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 @Service
 public class ApprovalService {
@@ -148,6 +150,21 @@ public class ApprovalService {
         LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BizApprovalOrder::getStatus, STATUS_PENDING);
         return bizApprovalOrderMapper.selectCount(wrapper);
+    }
+
+    public ReminderSummaryVO pendingReminder() {
+        requireApprovalModuleAccess();
+        ReminderSummaryVO reminder = new ReminderSummaryVO();
+        LambdaQueryWrapper<BizApprovalOrder> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(BizApprovalOrder::getStatus, STATUS_PENDING)
+                .orderByAsc(BizApprovalOrder::getId);
+        List<BizApprovalOrder> orders = bizApprovalOrderMapper.selectList(wrapper);
+        reminder.setCount((long) orders.size());
+        reminder.setSignature(orders.stream()
+                .map(BizApprovalOrder::getId)
+                .map(String::valueOf)
+                .collect(Collectors.joining(",")));
+        return reminder;
     }
 
     @Transactional(rollbackFor = Exception.class)

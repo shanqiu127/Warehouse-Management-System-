@@ -93,21 +93,35 @@
         </article>
       </section>
 
-      <section class="panel-grid panel-grid--double">
+      <section v-if="workRequirements.length" class="panel-grid">
         <article class="panel-card panel-card--accent">
           <div class="panel-head">
-            <h2>工作提示</h2>
-            <span>{{ tips.length }} 条</span>
+            <h2>工作要求</h2>
+            <span>{{ workRequirements.length }} 项</span>
           </div>
-          <div v-if="tips.length" class="tips-list">
-            <div v-for="(item, index) in tips" :key="`${index}-${item}`" class="tip-item">
-              <span class="tip-index">{{ String(index + 1).padStart(2, '0') }}</span>
-              <p>{{ item }}</p>
-            </div>
+          <div class="wr-list">
+            <button
+              v-for="item in sortedWorkRequirements"
+              :key="item.assignId"
+              type="button"
+              class="wr-item"
+              :class="{ 'wr-item--done': item.status === 3, 'wr-item--rejected': item.status === 4, 'wr-item--overdue': item.overdueCurrent }"
+              @click="goWorkRequirement(item)"
+            >
+              <div class="wr-item-main">
+                <span class="wr-item-content">{{ item.content }}</span>
+                <div class="wr-item-tags">
+                  <el-tag v-if="item.overdueLabel && item.overdueLabel !== '正常'" :type="overdueTagType(item.overdueLabel)" size="small">{{ item.overdueLabel }}</el-tag>
+                  <el-tag :type="wrTagType(item.status)" size="small">{{ item.statusLabel }}</el-tag>
+                </div>
+              </div>
+              <span class="wr-item-deadline">截止：{{ formatTime(item.endTime) }}</span>
+            </button>
           </div>
-          <div v-else class="empty-state">暂无工作提示</div>
         </article>
+      </section>
 
+      <section class="panel-grid">
         <article class="panel-card" v-loading="noticeLoading">
           <div class="panel-head">
             <h2>最新公告</h2>
@@ -137,19 +151,39 @@
           </el-descriptions-item>
         </el-descriptions>
       </el-dialog>
+
+      <transition name="task-reminder-fade">
+        <div v-if="showTaskReminder" class="task-reminder task-reminder--pending" role="status" aria-live="polite">
+          <button type="button" class="task-reminder__close" aria-label="关闭提醒" @click="dismissTaskReminder">×</button>
+          <div class="task-reminder__eyebrow">工作要求提醒</div>
+          <div class="task-reminder__title">待接受任务：{{ pendingTaskCount }}</div>
+          <p class="task-reminder__text">你当前有待接受的工作要求，请及时处理。</p>
+        </div>
+      </transition>
+
+      <transition name="task-reminder-fade">
+        <div v-if="showOverdueReminder" class="task-reminder task-reminder--overdue" role="status" aria-live="polite">
+          <button type="button" class="task-reminder__close" aria-label="关闭提醒" @click="dismissOverdueReminder">×</button>
+          <div class="task-reminder__eyebrow">超时任务提醒</div>
+          <div class="task-reminder__title">超时任务：{{ overdueTaskCount }}</div>
+          <p class="task-reminder__text">你当前有超时中的工作要求，请优先处理并补交执行结果。</p>
+        </div>
+      </transition>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getEmployeeWorkbenchAPI, updateEmployeeContactAPI } from '@/api/home'
 import { getNoticeDetailAPI, getNoticePageAPI } from '@/api/system'
 import { useUserStore } from '@/stores/user'
-import { normalizeDeptCode } from '@/utils/auth'
+import { getToken, normalizeDeptCode } from '@/utils/auth'
 
 const userStore = useUserStore()
+const router = useRouter()
 
 const summary = ref({
   userId: null,
@@ -185,11 +219,16 @@ const savedContact = ref({
 })
 const savingContact = ref(false)
 const editingContact = ref(false)
-const tips = ref([])
+const workRequirements = ref([])
 const noticeList = ref([])
 const noticeLoading = ref(false)
 const noticeDialogVisible = ref(false)
 const noticeDetail = ref({})
+const dismissedTaskReminderSignature = ref('')
+const dismissedOverdueReminderSignature = ref('')
+
+const TASK_REMINDER_KEY_PREFIX = 'employee-pending-task-reminder'
+const OVERDUE_REMINDER_KEY_PREFIX = 'employee-overdue-task-reminder'
 
 const deptCode = computed(() => normalizeDeptCode(summary.value.deptCode || userStore.deptCode))
 const displayName = computed(() => summary.value.realName || userStore.realName || summary.value.username || '部门员工')
@@ -220,7 +259,7 @@ const deptSceneMap = {
 
 const deptScene = computed(() => deptSceneMap[deptCode.value] || {
   title: '员工工作台',
-  subtitle: '查看个人资料、部门联络信息、公告和当前工作提示。'
+  subtitle: '查看个人资料、部门联络信息、公告和当前工作要求。'
 })
 
 const metricCards = computed(() => {
@@ -335,6 +374,111 @@ const audienceLabel = (row = {}) => {
   return '未设置'
 }
 
+const pendingWorkRequirements = computed(() => workRequirements.value.filter(item => item.status === 0))
+
+const pendingTaskCount = computed(() => pendingWorkRequirements.value.length)
+
+const overdueWorkRequirements = computed(() => workRequirements.value.filter(item => item.overdueCurrent))
+
+const overdueTaskCount = computed(() => overdueWorkRequirements.value.length)
+
+const pendingTaskSignature = computed(() => {
+  if (!summary.value.userId || pendingTaskCount.value === 0) {
+    return ''
+  }
+  const assignIds = pendingWorkRequirements.value
+    .map(item => Number(item.assignId))
+    .filter(item => !Number.isNaN(item))
+    .sort((a, b) => a - b)
+    .join(',')
+  return `${summary.value.userId}:${assignIds}`
+})
+
+const showTaskReminder = computed(() => {
+  return Boolean(pendingTaskSignature.value) && dismissedTaskReminderSignature.value !== pendingTaskSignature.value
+})
+
+const overdueTaskSignature = computed(() => {
+  if (!summary.value.userId || overdueTaskCount.value === 0) {
+    return ''
+  }
+  const assignIds = overdueWorkRequirements.value
+    .map(item => Number(item.assignId))
+    .filter(item => !Number.isNaN(item))
+    .sort((a, b) => a - b)
+    .join(',')
+  return `${summary.value.userId}:${assignIds}`
+})
+
+const showOverdueReminder = computed(() => {
+  return Boolean(overdueTaskSignature.value) && dismissedOverdueReminderSignature.value !== overdueTaskSignature.value
+})
+
+const sortedWorkRequirements = computed(() => {
+  return [...workRequirements.value].sort((a, b) => {
+    if (a.overdueCurrent && !b.overdueCurrent) return -1
+    if (!a.overdueCurrent && b.overdueCurrent) return 1
+    if (a.status === 3 && b.status !== 3) return 1
+    if (a.status !== 3 && b.status === 3) return -1
+    if (a.status === 4 && b.status !== 4) return 1
+    if (a.status !== 4 && b.status === 4) return -1
+    return 0
+  })
+})
+
+const wrTagType = (status) => {
+  const map = { 0: 'info', 1: '', 2: 'warning', 3: 'success', 4: 'danger', 5: 'danger' }
+  return map[status] ?? 'info'
+}
+
+const overdueTagType = (label) => {
+  if (label === '超时中') return 'danger'
+  if (label === '逾期提交' || label === '逾期完成') return 'warning'
+  return 'success'
+}
+
+const goWorkRequirement = (item) => {
+  router.push(`/work-requirement/${item.assignId}`)
+}
+
+const getTaskReminderStorageKey = (userId) => {
+  const token = getToken()
+  return `${TASK_REMINDER_KEY_PREFIX}:${userId}:${token}`
+}
+
+const getOverdueReminderStorageKey = (userId) => {
+  const token = getToken()
+  return `${OVERDUE_REMINDER_KEY_PREFIX}:${userId}:${token}`
+}
+
+const syncDismissedTaskReminder = () => {
+  if (!summary.value.userId) {
+    dismissedTaskReminderSignature.value = ''
+    dismissedOverdueReminderSignature.value = ''
+    return
+  }
+  dismissedTaskReminderSignature.value = sessionStorage.getItem(getTaskReminderStorageKey(summary.value.userId)) || ''
+  dismissedOverdueReminderSignature.value = sessionStorage.getItem(getOverdueReminderStorageKey(summary.value.userId)) || ''
+}
+
+const dismissTaskReminder = () => {
+  if (!summary.value.userId || !pendingTaskSignature.value) {
+    dismissedTaskReminderSignature.value = pendingTaskSignature.value
+    return
+  }
+  sessionStorage.setItem(getTaskReminderStorageKey(summary.value.userId), pendingTaskSignature.value)
+  dismissedTaskReminderSignature.value = pendingTaskSignature.value
+}
+
+const dismissOverdueReminder = () => {
+  if (!summary.value.userId || !overdueTaskSignature.value) {
+    dismissedOverdueReminderSignature.value = overdueTaskSignature.value
+    return
+  }
+  sessionStorage.setItem(getOverdueReminderStorageKey(summary.value.userId), overdueTaskSignature.value)
+  dismissedOverdueReminderSignature.value = overdueTaskSignature.value
+}
+
 const loadWorkbench = async () => {
   try {
     const res = await getEmployeeWorkbenchAPI()
@@ -351,7 +495,8 @@ const loadWorkbench = async () => {
     contactForm.phone = savedContact.value.phone
     contactForm.email = savedContact.value.email
     editingContact.value = !(savedContact.value.phone && savedContact.value.email)
-    tips.value = Array.isArray(res.data?.tips) ? res.data.tips : []
+    workRequirements.value = Array.isArray(res.data?.workRequirements) ? res.data.workRequirements : []
+    syncDismissedTaskReminder()
   } catch (error) {
     ElMessage.error(error.message || '员工工作台加载失败')
   }
@@ -597,7 +742,6 @@ onMounted(() => {
 
 .info-grid,
 .contact-form,
-.tips-list,
 .notice-list {
   display: grid;
   gap: 12px;
@@ -715,7 +859,6 @@ onMounted(() => {
 }
 
 .info-row,
-.tip-item,
 .notice-item {
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 18px;
@@ -733,26 +876,6 @@ onMounted(() => {
 .info-row strong {
   text-align: right;
   word-break: break-word;
-}
-
-.tip-item {
-  padding: 16px 18px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  align-items: start;
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.tip-index {
-  font-size: 0.88rem;
-  font-weight: 700;
-}
-
-.tip-item p {
-  margin: 0;
-  color: #0f172a;
-  line-height: 1.7;
 }
 
 .notice-item {
@@ -821,6 +944,182 @@ onMounted(() => {
 
   .info-row strong {
     text-align: left;
+  }
+}
+
+.wr-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wr-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 0.2s;
+  font-family: inherit;
+}
+
+.wr-item:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.10);
+}
+
+.wr-item--done {
+  opacity: 0.6;
+}
+
+.wr-item--done .wr-item-content {
+  text-decoration: line-through;
+}
+
+.wr-item--rejected {
+  opacity: 0.5;
+}
+
+.wr-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.wr-item-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.wr-item-content {
+  flex: 1;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-item-deadline {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.wr-item--overdue {
+  border-color: rgba(220, 38, 38, 0.28);
+  background: linear-gradient(135deg, rgba(254, 242, 242, 0.88), rgba(255, 255, 255, 0.94));
+}
+
+.task-reminder {
+  position: fixed;
+  right: 28px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 18px 20px 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 22px;
+  box-shadow: 0 22px 44px -24px rgba(15, 23, 42, 0.34);
+  z-index: 60;
+  animation: task-reminder-float 3.2s ease-in-out infinite;
+}
+
+.task-reminder--pending {
+  bottom: 28px;
+  background: linear-gradient(145deg, rgba(255, 251, 235, 0.97), rgba(255, 255, 255, 0.96));
+}
+
+.task-reminder--overdue {
+  bottom: 170px;
+  background: linear-gradient(145deg, rgba(254, 242, 242, 0.97), rgba(255, 255, 255, 0.96));
+}
+
+.task-reminder__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.task-reminder__close:hover {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.task-reminder__eyebrow {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.task-reminder--pending .task-reminder__eyebrow {
+  color: #b45309;
+}
+
+.task-reminder--overdue .task-reminder__eyebrow {
+  color: #b91c1c;
+}
+
+.task-reminder__title {
+  color: #111827;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.task-reminder__text {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.task-reminder-fade-enter-active,
+.task-reminder-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.task-reminder-fade-enter-from,
+.task-reminder-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes task-reminder-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (max-width: 900px) {
+  .task-reminder {
+    right: 16px;
+    width: calc(100vw - 32px);
+  }
+
+  .task-reminder--pending {
+    bottom: 16px;
+  }
+
+  .task-reminder--overdue {
+    bottom: 158px;
   }
 }
 </style>

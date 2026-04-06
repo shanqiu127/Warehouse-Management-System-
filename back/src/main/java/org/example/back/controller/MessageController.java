@@ -1,6 +1,5 @@
 package org.example.back.controller;
 
-import org.example.back.common.annotation.RequireAdmin;
 import org.example.back.common.result.PageResult;
 import org.example.back.common.result.Result;
 import org.example.back.dto.MessageQueryDTO;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/system/messages")
-@RequireAdmin("仅管理员可访问消息中心")
 public class MessageController {
 
     @Autowired

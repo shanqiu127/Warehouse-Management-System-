@@ -9,7 +9,11 @@
           <el-menu-item index="/system/dept">全部门管理</el-menu-item>
           <el-menu-item index="/system/employee">全员工管理</el-menu-item>
           <el-menu-item index="/system/hr-chart">员工分布图表</el-menu-item>
-          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-sub-menu index="/notification">
+            <template #title>通知</template>
+            <el-menu-item index="/system/work-requirement">工作要求</el-menu-item>
+            <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/system/user">用户部门管理</el-menu-item>
         </template>
 
@@ -17,7 +21,11 @@
           <el-menu-item index="/business/purchase">商品进货</el-menu-item>
           <el-menu-item index="/business/purchase-return">进货退货</el-menu-item>
           <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
-          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-sub-menu index="/notification">
+            <template #title>通知</template>
+            <el-menu-item index="/system/work-requirement">工作要求</el-menu-item>
+            <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/system/user">用户部门管理</el-menu-item>
         </template>
 
@@ -25,7 +33,11 @@
           <el-menu-item index="/business/sales">商品销售</el-menu-item>
           <el-menu-item index="/business/sales-return">销售退货</el-menu-item>
           <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
-          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-sub-menu index="/notification">
+            <template #title>通知</template>
+            <el-menu-item index="/system/work-requirement">工作要求</el-menu-item>
+            <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/system/user">用户部门管理</el-menu-item>
         </template>
 
@@ -34,13 +46,21 @@
           <el-menu-item index="/base/goods">商品资料管理</el-menu-item>
           <el-menu-item index="/business/stock-warning">预警中心</el-menu-item>
           <el-menu-item index="/system/void-approval">作废审批</el-menu-item>
-          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-sub-menu index="/notification">
+            <template #title>通知</template>
+            <el-menu-item index="/system/work-requirement">工作要求</el-menu-item>
+            <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/system/user">用户部门管理</el-menu-item>
         </template>
 
         <template v-else-if="isFinanceAdmin">
           <el-menu-item index="/business/sales-chart">销售统计图表</el-menu-item>
-          <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          <el-sub-menu index="/notification">
+            <template #title>通知</template>
+            <el-menu-item index="/system/work-requirement">工作要求</el-menu-item>
+            <el-menu-item index="/system/notice">公告管理</el-menu-item>
+          </el-sub-menu>
           <el-menu-item index="/system/user">用户部门管理</el-menu-item>
         </template>
 

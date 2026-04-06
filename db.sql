@@ -906,5 +906,73 @@ END //
 DELIMITER ;
 
 -- =============================================
+-- 工作要求模块
+-- =============================================
+
+-- 工作要求主表
+CREATE TABLE `work_requirement` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `content` TEXT NOT NULL COMMENT '要求内容',
+    `start_time` DATETIME NOT NULL COMMENT '要求开始时间',
+    `end_time` DATETIME NOT NULL COMMENT '要求截止时间',
+    `target_scope` VARCHAR(20) NOT NULL DEFAULT 'all' COMMENT '对象范围: all-全体部门员工, selected-指定员工',
+    `creator_id` BIGINT NOT NULL COMMENT '创建人用户ID',
+    `creator_name` VARCHAR(50) NOT NULL COMMENT '创建人姓名',
+    `dept_id` BIGINT NOT NULL COMMENT '所属部门ID',
+    `dept_code` VARCHAR(30) NOT NULL COMMENT '所属部门代码',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_dept_id` (`dept_id`),
+    KEY `idx_creator_id` (`creator_id`),
+    KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工作要求主表';
+
+-- 工作要求分配表（每个员工对每个要求一条记录，记录流程状态）
+CREATE TABLE `work_requirement_assign` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `requirement_id` BIGINT NOT NULL COMMENT '关联工作要求ID',
+    `employee_user_id` BIGINT NOT NULL COMMENT '被分配的员工用户ID',
+    `employee_name` VARCHAR(50) NOT NULL COMMENT '员工姓名',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '流程状态: 0-待接受, 1-执行中, 2-待审核, 3-已完成, 4-拒收, 5-已驳回',
+    `overdue_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '是否已超时: 0-否, 1-是',
+    `overdue_at` DATETIME DEFAULT NULL COMMENT '首次超时时间',
+    `submitted_on_time` TINYINT DEFAULT NULL COMMENT '是否按时提交: 1-按时, 0-逾期, NULL-未提交',
+    `overdue_remind_count` INT NOT NULL DEFAULT 0 COMMENT '已发送超时提醒次数',
+    `last_remind_time` DATETIME DEFAULT NULL COMMENT '最近一次超时提醒时间',
+    `completed_at` DATETIME DEFAULT NULL COMMENT '最终完成时间',
+    `execute_result` TEXT COMMENT '执行结果文本',
+    `reject_count` INT NOT NULL DEFAULT 0 COMMENT '驳回次数',
+    `accepted_at` DATETIME DEFAULT NULL COMMENT '接受时间',
+    `submitted_at` DATETIME DEFAULT NULL COMMENT '提交审核时间',
+    `reviewed_at` DATETIME DEFAULT NULL COMMENT '审核完成时间',
+    `reviewer_id` BIGINT DEFAULT NULL COMMENT '审核人ID',
+    `reviewer_name` VARCHAR(50) DEFAULT NULL COMMENT '审核人姓名',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_requirement_employee` (`requirement_id`, `employee_user_id`),
+    KEY `idx_requirement_id` (`requirement_id`),
+    KEY `idx_employee_user_id_status` (`employee_user_id`, `status`),
+    KEY `idx_status_overdue_employee` (`status`, `overdue_flag`, `employee_user_id`),
+    KEY `idx_is_deleted` (`is_deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工作要求分配表';
+
+-- 工作要求执行附件表
+CREATE TABLE `work_requirement_attachment` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `assign_id` BIGINT NOT NULL COMMENT '关联分配记录ID',
+    `file_name` VARCHAR(200) NOT NULL COMMENT '原始文件名',
+    `file_path` VARCHAR(500) NOT NULL COMMENT '服务端存储路径',
+    `file_size` BIGINT DEFAULT NULL COMMENT '文件大小(字节)',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `is_deleted` TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-正常, 1-删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_assign_id` (`assign_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工作要求执行附件表';
+
+-- =============================================
 -- 脚本执行完成
 -- =============================================

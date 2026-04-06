@@ -152,6 +152,18 @@ const router = createRouter({
           name: "SystemOperationLog",
           component: () => import("../views/system/OperationLogView.vue"),
           meta: { roles: ['superadmin'] }
+        },
+        {
+          path: "system/work-requirement",
+          name: "SystemWorkRequirement",
+          component: () => import("../views/system/WorkRequirementView.vue"),
+          meta: { roles: ['admin'] }
+        },
+        {
+          path: "work-requirement/:assignId",
+          name: "WorkRequirementDetail",
+          component: () => import("../views/WorkRequirementDetailView.vue"),
+          meta: { roles: ['employee', 'admin'] }
         }
       ]
     },

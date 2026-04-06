@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 
@@ -28,6 +29,7 @@ public class MessageService {
     private static final int MESSAGE_READ = 1;
     private static final int USER_STATUS_ENABLED = 1;
     private static final String ROLE_ADMIN = "admin";
+    private static final DateTimeFormatter MESSAGE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Autowired
     private SysMessageMapper sysMessageMapper;
@@ -194,6 +196,33 @@ public class MessageService {
         );
     }
 
+    public void sendWorkRequirementOverdueToEmployee(Long userId, String requirementContent, LocalDateTime endTime) {
+        sendToUser(
+                userId,
+                "工作要求已超时",
+                String.format(
+                        Locale.ROOT,
+                        "你的工作要求“%s”已超过截止时间%s，请尽快处理并提交执行结果。",
+                        safeRequirementSummary(requirementContent),
+                        formatMessageTime(endTime)
+                )
+        );
+    }
+
+    public void sendWorkRequirementOverdueToDeptAdmins(Long deptId, String employeeName, String requirementContent, LocalDateTime endTime) {
+        sendToDeptAdmins(
+                deptId,
+                "员工工作要求超时提醒",
+                String.format(
+                        Locale.ROOT,
+                        "员工%s的工作要求“%s”已超时，截止时间%s，请及时关注处理进度。",
+                        safeEmployeeName(employeeName),
+                        safeRequirementSummary(requirementContent),
+                        formatMessageTime(endTime)
+                )
+        );
+    }
+
     private void sendToDeptAdmins(Long deptId, String title, String content) {
         if (deptId == null || !StringUtils.hasText(title) || !StringUtils.hasText(content)) {
             return;
@@ -217,10 +246,25 @@ public class MessageService {
         }
     }
 
-    private void requireMessageAccess() {
-        if (!authzService.isAdmin()) {
-            throw BusinessException.forbidden("仅部门管理员可访问消息中心");
+    private void sendToUser(Long userId, String title, String content) {
+        if (userId == null || !StringUtils.hasText(title) || !StringUtils.hasText(content)) {
+            return;
         }
+        SysUser recipient = sysUserMapper.selectById(userId);
+        if (recipient == null || !Integer.valueOf(USER_STATUS_ENABLED).equals(recipient.getStatus())) {
+            return;
+        }
+        SysMessage message = new SysMessage();
+        message.setRecipientUserId(recipient.getId());
+        message.setRecipientDeptId(recipient.getDeptId());
+        message.setTitle(title.trim());
+        message.setContent(content.trim());
+        message.setIsRead(MESSAGE_UNREAD);
+        sysMessageMapper.insert(message);
+    }
+
+    private void requireMessageAccess() {
+        authzService.currentUser();
     }
 
     private SysMessage requireOwnedMessage(Long id) {
@@ -252,5 +296,17 @@ public class MessageService {
 
     private String safeOperatorLabel(String operatorLabel) {
         return StringUtils.hasText(operatorLabel) ? operatorLabel.trim() : "系统";
+    }
+
+    private String safeRequirementSummary(String requirementContent) {
+        if (!StringUtils.hasText(requirementContent)) {
+            return "工作要求";
+        }
+        String normalized = requirementContent.trim().replaceAll("\\s+", " ");
+        return normalized.length() > 24 ? normalized.substring(0, 24) + "..." : normalized;
+    }
+
+    private String formatMessageTime(LocalDateTime time) {
+        return time == null ? "前" : "（" + MESSAGE_TIME_FORMATTER.format(time) + "）前";
     }
 }

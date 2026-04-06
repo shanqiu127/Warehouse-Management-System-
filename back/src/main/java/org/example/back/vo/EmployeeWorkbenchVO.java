@@ -11,7 +11,7 @@ public class EmployeeWorkbenchVO {
     private SummaryInfo summary;
     private ProfileInfo profile;
     private DeptContactInfo deptContact;
-    private List<String> tips;
+    private List<WorkRequirementTipVO> workRequirements;
 
     @Data
     public static class SummaryInfo {

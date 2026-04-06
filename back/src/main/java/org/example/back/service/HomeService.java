@@ -25,7 +25,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 @Service
@@ -54,6 +53,9 @@ public class HomeService {
 
     @Autowired
     private SysDeptMapper sysDeptMapper;
+
+    @Autowired
+    private WorkRequirementService workRequirementService;
 
     public HomeSummaryVO summary() {
         LoginResponse.UserInfoVO userInfo = authService.getUserInfo();
@@ -125,7 +127,7 @@ public class HomeService {
         }
         result.setDeptContact(deptContact);
 
-        result.setTips(buildTips(deptCode));
+        result.setWorkRequirements(workRequirementService.getEmployeeWorkTips(userInfo.getId()));
 
         return result;
     }
@@ -171,17 +173,6 @@ public class HomeService {
         vo.setLastLoginTime(user == null ? null : user.getLastLoginTime());
         vo.setServerTime(LocalDateTime.now());
         return vo;
-    }
-
-    private List<String> buildTips(String deptCode) {
-        Map<String, List<String>> tipsMap = Map.of(
-            "hr", List.of("及时提交入离职资料", "保持员工档案信息完整规范", "关注考勤材料提交时效"),
-            "purchase", List.of("关注补货优先级与供应商跟进", "退货登记请在当日完成", "核对采购单据确保准确"),
-            "sales", List.of("每日核对订单信息与库存", "缺货问题及时与仓储沟通", "退货登记请按流程及时提交"),
-            "warehouse", List.of("优先关注低库存与零库存商品", "盘点差异需在当日完成登记", "涉及历史单据时注意审批协同"),
-            "finance", List.of("关注月结节奏与对账时间", "核对对账资料确保数据准确", "配合各部门做好数据核对")
-        );
-        return tipsMap.getOrDefault(deptCode != null ? deptCode : "", List.of("请关注最新公告", "如有疑问请联系部门负责人"));
     }
 
     private SysEmployee findEmployeeByUserId(Long userId) {

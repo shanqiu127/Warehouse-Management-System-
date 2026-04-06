@@ -62,6 +62,22 @@
           </el-descriptions-item>
         </el-descriptions>
       </el-dialog>
+
+      <transition-group name="admin-reminder-fade" tag="div" class="admin-reminder-stack">
+        <div
+          v-for="item in visibleReminders"
+          :key="`${item.key}:${item.signature}`"
+          class="admin-reminder"
+          :class="`admin-reminder--${item.tone}`"
+          role="status"
+          aria-live="polite"
+        >
+          <button type="button" class="admin-reminder__close" aria-label="关闭提醒" @click="dismissReminder(item)">×</button>
+          <div class="admin-reminder__eyebrow">{{ item.eyebrow }}</div>
+          <div class="admin-reminder__title">{{ item.title }}</div>
+          <p class="admin-reminder__text">{{ item.text }}</p>
+        </div>
+      </transition-group>
     </div>
   </div>
 </template>
@@ -71,9 +87,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
-import { getAdminHomeLatestNoticeAPI, getNoticeDetailAPI } from '@/api/system'
+import { getAdminHomeLatestNoticeAPI, getApprovalPendingReminderAPI, getNoticeDetailAPI } from '@/api/system'
+import { getWorkRequirementOverdueReminderAPI, getWorkRequirementPendingReviewReminderAPI } from '@/api/workRequirement'
 import { useUserStore } from '@/stores/user'
-import { normalizeDeptCode } from '@/utils/auth'
+import { getToken, normalizeDeptCode } from '@/utils/auth'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -92,6 +109,12 @@ const noticeList = ref([])
 const noticeLoading = ref(false)
 const noticeDialogVisible = ref(false)
 const noticeDetail = ref({})
+const overdueReminder = ref({ count: 0, signature: '' })
+const workRequirementReminder = ref({ count: 0, signature: '' })
+const approvalReminder = ref({ count: 0, signature: '' })
+const dismissedReminderSignatures = ref({})
+
+const ADMIN_REMINDER_KEY_PREFIX = 'admin-dashboard-reminder'
 
 const deptCode = computed(() => normalizeDeptCode(userStore.deptCode))
 const deptLabel = computed(() => summary.value.deptName || userStore.deptName || '未分配部门')
@@ -105,6 +128,7 @@ const moduleLabelMap = {
 }
 
 const moduleLabel = computed(() => moduleLabelMap[deptCode.value] || '部门管理员工作台')
+const isWarehouseAdmin = computed(() => deptCode.value === 'warehouse')
 
 const metricCards = computed(() => {
   const baseCards = [
@@ -176,14 +200,131 @@ const audienceLabel = (row = {}) => {
   return '未设置'
 }
 
+const visibleReminders = computed(() => {
+  const reminders = []
+
+  if (Number(overdueReminder.value.count) > 0 && dismissedReminderSignatures.value.workRequirementOverdue !== overdueReminder.value.signature) {
+    reminders.push({
+      key: 'workRequirementOverdue',
+      signature: overdueReminder.value.signature,
+      eyebrow: '工作要求超时提醒',
+      title: `超时任务：${overdueReminder.value.count}`,
+      text: '你当前部门已有超时中的工作要求，请优先跟进处理。',
+      tone: 'scarlet'
+    })
+  }
+
+  if (Number(workRequirementReminder.value.count) > 0 && dismissedReminderSignatures.value.workRequirementReview !== workRequirementReminder.value.signature) {
+    reminders.push({
+      key: 'workRequirementReview',
+      signature: workRequirementReminder.value.signature,
+      eyebrow: '工作要求审核提醒',
+      title: `待审核任务：${workRequirementReminder.value.count}`,
+      text: '你当前有待审核的工作要求，请及时处理。',
+      tone: 'amber'
+    })
+  }
+
+  if (isWarehouseAdmin.value && Number(approvalReminder.value.count) > 0 && dismissedReminderSignatures.value.voidApproval !== approvalReminder.value.signature) {
+    reminders.push({
+      key: 'voidApproval',
+      signature: approvalReminder.value.signature,
+      eyebrow: '作废/红冲审批提醒',
+      title: `待审核作废/红冲审批：${approvalReminder.value.count}`,
+      text: '你当前有待审核的作废/红冲审批，请及时处理。',
+      tone: 'rose'
+    })
+  }
+
+  return reminders
+})
+
+const getReminderStorageKey = (userId, reminderKey) => {
+  const token = getToken()
+  return `${ADMIN_REMINDER_KEY_PREFIX}:${userId}:${reminderKey}:${token}`
+}
+
+const syncDismissedReminders = () => {
+  if (!summary.value.userId) {
+    dismissedReminderSignatures.value = {}
+    return
+  }
+  dismissedReminderSignatures.value = {
+    workRequirementOverdue: sessionStorage.getItem(getReminderStorageKey(summary.value.userId, 'workRequirementOverdue')) || '',
+    workRequirementReview: sessionStorage.getItem(getReminderStorageKey(summary.value.userId, 'workRequirementReview')) || '',
+    voidApproval: sessionStorage.getItem(getReminderStorageKey(summary.value.userId, 'voidApproval')) || ''
+  }
+}
+
+const dismissReminder = (item) => {
+  if (!summary.value.userId || !item?.key || !item?.signature) {
+    return
+  }
+  sessionStorage.setItem(getReminderStorageKey(summary.value.userId, item.key), item.signature)
+  dismissedReminderSignatures.value = {
+    ...dismissedReminderSignatures.value,
+    [item.key]: item.signature
+  }
+}
+
 const loadSummary = async () => {
   try {
     const res = await getHomeSummaryAPI()
     if (res.code === 200) {
       summary.value = { ...summary.value, ...res.data }
+      syncDismissedReminders()
     }
   } catch {
     ElMessage.error('首页摘要加载失败')
+  }
+}
+
+const loadWorkRequirementReminder = async () => {
+  try {
+    const res = await getWorkRequirementPendingReviewReminderAPI()
+    if (res.code !== 200) {
+      throw new Error(res.msg || '工作要求审核提醒加载失败')
+    }
+    workRequirementReminder.value = {
+      count: Number(res.data?.count || 0),
+      signature: res.data?.signature || ''
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '工作要求审核提醒加载失败')
+  }
+}
+
+const loadOverdueReminder = async () => {
+  try {
+    const res = await getWorkRequirementOverdueReminderAPI()
+    if (res.code !== 200) {
+      throw new Error(res.msg || '工作要求超时提醒加载失败')
+    }
+    overdueReminder.value = {
+      count: Number(res.data?.count || 0),
+      signature: res.data?.signature || ''
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '工作要求超时提醒加载失败')
+  }
+}
+
+const loadApprovalReminder = async () => {
+  if (!isWarehouseAdmin.value) {
+    approvalReminder.value = { count: 0, signature: '' }
+    return
+  }
+  try {
+    const res = await getApprovalPendingReminderAPI()
+    if (res.code !== 200) {
+      throw new Error(res.msg || '作废审批提醒加载失败')
+    }
+    approvalReminder.value = {
+      count: Number(res.data?.count || 0),
+      signature: res.data?.signature || ''
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '作废审批提醒加载失败')
   }
 }
 
@@ -221,6 +362,9 @@ const go = (path) => {
 onMounted(() => {
   loadSummary()
   loadNotices()
+  loadOverdueReminder()
+  loadWorkRequirementReminder()
+  loadApprovalReminder()
 })
 </script>
 
@@ -414,6 +558,114 @@ onMounted(() => {
   margin: 0;
 }
 
+.admin-reminder-stack {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 60;
+  display: grid;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.admin-reminder {
+  position: relative;
+  width: min(336px, calc(100vw - 32px));
+  padding: 18px 20px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 22px 44px -24px rgba(15, 23, 42, 0.34);
+  pointer-events: auto;
+  animation: admin-reminder-float 3.4s ease-in-out infinite;
+}
+
+.admin-reminder--amber {
+  background: linear-gradient(145deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.admin-reminder--scarlet {
+  background: linear-gradient(145deg, rgba(254, 242, 242, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.admin-reminder--rose {
+  background: linear-gradient(145deg, rgba(255, 241, 242, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.admin-reminder__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.admin-reminder__close:hover {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.admin-reminder__eyebrow {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.admin-reminder--amber .admin-reminder__eyebrow {
+  color: #b45309;
+}
+
+.admin-reminder--scarlet .admin-reminder__eyebrow {
+  color: #b91c1c;
+}
+
+.admin-reminder--rose .admin-reminder__eyebrow {
+  color: #be123c;
+}
+
+.admin-reminder__title {
+  color: #111827;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.admin-reminder__text {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.admin-reminder-fade-enter-active,
+.admin-reminder-fade-leave-active,
+.admin-reminder-fade-move {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.admin-reminder-fade-enter-from,
+.admin-reminder-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes admin-reminder-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
 @media (max-width: 960px) {
   .panel-grid,
   .action-grid {
@@ -422,6 +674,15 @@ onMounted(() => {
 
   .hero-card {
     flex-direction: column;
+  }
+
+  .admin-reminder-stack {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .admin-reminder {
+    width: calc(100vw - 32px);
   }
 }
 </style>

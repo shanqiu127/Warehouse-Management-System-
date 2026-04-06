@@ -11,6 +11,7 @@ import org.example.back.dto.ApprovalDecisionDTO;
 import org.example.back.dto.ApprovalQueryDTO;
 import org.example.back.service.ApprovalService;
 import org.example.back.vo.ApprovalOrderVO;
+import org.example.back.vo.ReminderSummaryVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -44,6 +45,12 @@ public class ApprovalController {
     @RequireAdmin("仅管理员可查看待审批数量")
     public Result<Long> pendingCount() {
         return Result.success(approvalService.pendingCount());
+    }
+
+    @GetMapping("/pending-reminder")
+    @RequireAdmin("仅管理员可查看待审批提醒")
+    public Result<ReminderSummaryVO> pendingReminder() {
+        return Result.success(approvalService.pendingReminder());
     }
 
     @PutMapping("/{id}/approve")
