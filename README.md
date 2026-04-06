@@ -121,6 +121,9 @@ flowchart TD
 ### 必须更改：
 - back/src/main/resources/application.properties 中数据库密码请按本机环境修改。
 ### 可选更改：
+- back/src/main/resources/application.properties 中 `app.upload.base-path` 当前建议使用相对路径 `../uploads`。
+	- 该配置表示：当你在 `back` 目录启动后端时，上传图片会落到项目根目录下的 `uploads/` 文件夹。
+	- 如果你希望上传文件落到别的位置，可以按本机环境改成其他相对路径或绝对路径。
 - db.sql 中初始化的默认账号和密码（当前为 `superadmin`、`hr_admin`、`purchase_admin`、`sales_admin`、`warehouse_admin`、`finance_admin` 及各部门 `*_employee`，默认密码均为 `123456`）可按需调整。（应用于登录系统时的默认账号密码）
 - back/src/main/java/org/example/back/service/UserManageService.java 中的默认密码为 `123456`。（应用于新建用户时的默认密码）
 - 这两个是不一样的，前者是数据库初始化时的默认账号密码，后者是通过用户管理界面新建用户时的默认密码。
@@ -162,6 +165,8 @@ cd back
 ```
 
 后端默认地址：`http://localhost:8080`
+
+
 
 ### 4. 启动前端
 
