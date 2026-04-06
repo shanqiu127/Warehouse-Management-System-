@@ -150,4 +150,13 @@ class UserManageServiceTest {
 
         verify(sysUserMapper, never()).insert(any(SysUser.class));
     }
+
+    @Test
+    void resetPassword_shouldRejectWeakPassword() {
+        BusinessException ex = assertThrows(BusinessException.class, () -> userManageService.resetPassword(77L, "12345678"));
+
+        assertEquals(400, ex.getCode());
+        assertEquals("新密码至少8位，且需同时包含字母和数字", ex.getMsg());
+        verify(sysUserMapper, never()).updateById(any(SysUser.class));
+    }
 }

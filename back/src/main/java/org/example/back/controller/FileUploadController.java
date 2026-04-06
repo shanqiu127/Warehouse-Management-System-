@@ -1,81 +1,48 @@
 package org.example.back.controller;
 
-import org.example.back.common.exception.BusinessException;
 import org.example.back.common.result.Result;
-import org.springframework.beans.factory.annotation.Value;
+import org.example.back.service.WorkRequirementAttachmentStorageService;
+import org.example.back.service.WorkRequirementService;
+import org.example.back.vo.UploadTokenVO;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/upload")
 public class FileUploadController {
 
-    @Value("${app.upload.base-path:./uploads}")
-    private String basePath;
+    @Autowired
+    private WorkRequirementAttachmentStorageService attachmentStorageService;
 
-    @Value("${server.servlet.context-path:}")
-    private String contextPath;
-
-    @Value("${app.upload.allowed-types:image/jpeg,image/png,image/gif,image/webp}")
-    private String allowedTypes;
+    @Autowired
+    private WorkRequirementService workRequirementService;
 
     @PostMapping("/image")
-    public Result<String> uploadImage(@RequestParam("file") MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw BusinessException.validateFail("请选择要上传的文件");
-        }
+    public Result<UploadTokenVO> uploadImage(@RequestParam("file") MultipartFile file) {
+        return Result.success(attachmentStorageService.storeTempImage(file));
+    }
 
-        String contentType = file.getContentType();
-        Set<String> allowed = Arrays.stream(allowedTypes.split(","))
-                .map(String::trim)
-                .collect(Collectors.toSet());
-        if (contentType == null || !allowed.contains(contentType)) {
-            throw BusinessException.validateFail("不支持的文件类型，仅允许上传图片(jpg/png/gif/webp)");
-        }
-
-        String originalFilename = file.getOriginalFilename();
-        String ext = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            ext = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-        // 白名单校验扩展名
-        Set<String> allowedExts = Set.of(".jpg", ".jpeg", ".png", ".gif", ".webp");
-        if (!allowedExts.contains(ext.toLowerCase())) {
-            throw BusinessException.validateFail("不支持的文件扩展名");
-        }
-
-        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        String fileName = UUID.randomUUID().toString().replace("-", "") + ext;
-        Path uploadRoot = Paths.get(basePath).toAbsolutePath().normalize();
-        Path dir = uploadRoot.resolve(datePath).normalize();
-
-        try {
-            Files.createDirectories(dir);
-            Path target = dir.resolve(fileName);
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
-            }
-            String relativePath = "/uploads/" + datePath + "/" + fileName;
-            String normalizedContextPath = (contextPath == null || contextPath.isBlank()) ? "" : contextPath;
-            return Result.success(normalizedContextPath + relativePath);
-        } catch (IOException e) {
-            throw new BusinessException(500, "文件上传失败: " + e.getMessage());
-        }
+    @GetMapping("/work-requirement/attachments/{attachmentId}")
+    public ResponseEntity<Resource> downloadWorkRequirementAttachment(@PathVariable Long attachmentId) {
+        WorkRequirementService.AttachmentDownload attachment = workRequirementService.getAccessibleAttachment(attachmentId);
+        Resource resource = attachmentStorageService.loadAsResource(attachment.getStoredPath());
+        MediaType mediaType = attachmentStorageService.resolveMediaType(attachment.getFileName());
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename*=UTF-8''" + java.net.URLEncoder.encode(attachment.getFileName(), StandardCharsets.UTF_8))
+                .body(resource);
     }
 }

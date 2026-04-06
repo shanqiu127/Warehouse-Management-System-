@@ -29,8 +29,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -64,6 +68,9 @@ public class WorkRequirementService {
 
     @Autowired
     private MessageService messageService;
+
+    @Autowired
+    private WorkRequirementAttachmentStorageService attachmentStorageService;
 
     // ========== 管理员端 ==========
 
@@ -347,11 +354,12 @@ public class WorkRequirementService {
             throw BusinessException.forbidden("只能删除自己创建的工作要求");
         }
 
-        workRequirementMapper.deleteById(id);
-
         LambdaQueryWrapper<WorkRequirementAssign> assignWrapper = new LambdaQueryWrapper<>();
         assignWrapper.eq(WorkRequirementAssign::getRequirementId, id);
         List<WorkRequirementAssign> assigns = assignMapper.selectList(assignWrapper);
+        cleanupAttachmentsByAssignIds(assigns.stream().map(WorkRequirementAssign::getId).toList());
+
+        workRequirementMapper.deleteById(id);
         for (WorkRequirementAssign assign : assigns) {
             assignMapper.deleteById(assign.getId());
         }
@@ -386,10 +394,7 @@ public class WorkRequirementService {
             assign.setSubmittedAt(null);
             assign.setSubmittedOnTime(null);
             assign.setCompletedAt(null);
-            // 删除旧附件
-            LambdaQueryWrapper<WorkRequirementAttachment> attWrapper = new LambdaQueryWrapper<>();
-            attWrapper.eq(WorkRequirementAttachment::getAssignId, assignId);
-            attachmentMapper.delete(attWrapper);
+            cleanupAttachmentsByAssignIds(List.of(assignId));
         }
 
         assignMapper.updateById(assign);
@@ -538,23 +543,67 @@ public class WorkRequirementService {
         assign.setCompletedAt(null);
         assignMapper.updateById(assign);
 
-        // 删除旧附件（驳回后重新提交的场景）
         LambdaQueryWrapper<WorkRequirementAttachment> oldAttWrapper = new LambdaQueryWrapper<>();
         oldAttWrapper.eq(WorkRequirementAttachment::getAssignId, dto.getAssignId());
-        attachmentMapper.delete(oldAttWrapper);
+        List<WorkRequirementAttachment> currentAttachments = attachmentMapper.selectList(oldAttWrapper);
+        Map<Long, WorkRequirementAttachment> currentAttachmentMap = currentAttachments.stream()
+                .filter(item -> item.getId() != null)
+                .collect(Collectors.toMap(WorkRequirementAttachment::getId, item -> item, (left, right) -> left, LinkedHashMap::new));
 
-        // 保存新附件
-        if (dto.getAttachmentPaths() != null && !dto.getAttachmentPaths().isEmpty()) {
-            for (String path : dto.getAttachmentPaths()) {
-                WorkRequirementAttachment att = new WorkRequirementAttachment();
-                att.setAssignId(dto.getAssignId());
-                att.setFilePath(path);
-                // 从路径提取文件名
-                String fileName = path.contains("/") ? path.substring(path.lastIndexOf("/") + 1) : path;
-                att.setFileName(fileName);
-                attachmentMapper.insert(att);
+        List<Long> existingAttachmentIds = sanitizeExistingAttachmentIds(dto.getExistingAttachmentIds());
+        List<WorkRequirementAttachment> attachmentsToKeep = new ArrayList<>();
+        for (Long attachmentId : existingAttachmentIds) {
+            WorkRequirementAttachment existingAttachment = currentAttachmentMap.get(attachmentId);
+            if (existingAttachment == null) {
+                throw BusinessException.forbidden("附件引用无效或不属于当前工作要求");
             }
+            attachmentsToKeep.add(existingAttachment);
         }
+
+        List<WorkRequirementAttachmentStorageService.TempUploadMeta> newAttachments = resolveNewAttachments(dto.getNewAttachmentTokens());
+
+        // 删除旧附件（驳回后重新提交的场景）
+        cleanupAttachmentEntities(currentAttachments);
+
+        for (WorkRequirementAttachment existingAttachment : attachmentsToKeep) {
+            WorkRequirementAttachment clonedAttachment = new WorkRequirementAttachment();
+            clonedAttachment.setAssignId(dto.getAssignId());
+            clonedAttachment.setFileName(existingAttachment.getFileName());
+            clonedAttachment.setFilePath(existingAttachment.getFilePath());
+            clonedAttachment.setFileSize(existingAttachment.getFileSize());
+            attachmentMapper.insert(clonedAttachment);
+        }
+
+        for (WorkRequirementAttachmentStorageService.TempUploadMeta tempUpload : newAttachments) {
+            WorkRequirementAttachment newAttachment = new WorkRequirementAttachment();
+            newAttachment.setAssignId(dto.getAssignId());
+            newAttachment.setFileName(tempUpload.getFileName());
+            newAttachment.setFilePath(tempUpload.getStoredPath());
+            newAttachment.setFileSize(tempUpload.getFileSize());
+            attachmentMapper.insert(newAttachment);
+        }
+    }
+
+    public AttachmentDownload getAccessibleAttachment(Long attachmentId) {
+        WorkRequirementAttachment attachment = attachmentMapper.selectById(attachmentId);
+        if (attachment == null) {
+            throw BusinessException.notFound("附件不存在");
+        }
+        WorkRequirementAssign assign = requireAssign(attachment.getAssignId());
+        WorkRequirement requirement = requireRequirement(assign.getRequirementId());
+
+        LoginResponse.UserInfoVO currentUser = authzService.currentUser();
+        if (authzService.isSuperAdmin()) {
+            return new AttachmentDownload(attachment.getFileName(), attachment.getFilePath());
+        }
+        if (authzService.isAdmin()) {
+            authzService.requireCurrentDept(requirement.getDeptId(), "无权访问其他部门的工作要求附件");
+            return new AttachmentDownload(attachment.getFileName(), attachment.getFilePath());
+        }
+        if (!Objects.equals(assign.getEmployeeUserId(), currentUser.getId())) {
+            throw BusinessException.forbidden("无权访问该附件");
+        }
+        return new AttachmentDownload(attachment.getFileName(), attachment.getFilePath());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -847,6 +896,66 @@ public class WorkRequirementService {
         return value == null ? 0 : value;
     }
 
+    private void cleanupAttachmentsByAssignIds(List<Long> assignIds) {
+        if (assignIds == null || assignIds.isEmpty()) {
+            return;
+        }
+        List<Long> validAssignIds = assignIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (validAssignIds.isEmpty()) {
+            return;
+        }
+        LambdaQueryWrapper<WorkRequirementAttachment> attachmentWrapper = new LambdaQueryWrapper<>();
+        attachmentWrapper.in(WorkRequirementAttachment::getAssignId, validAssignIds);
+        List<WorkRequirementAttachment> attachments = attachmentMapper.selectList(attachmentWrapper);
+        cleanupAttachmentEntities(attachments);
+    }
+
+    private void cleanupAttachmentEntities(List<WorkRequirementAttachment> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return;
+        }
+        List<Long> attachmentIds = attachments.stream()
+                .map(WorkRequirementAttachment::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (!attachmentIds.isEmpty()) {
+            LambdaQueryWrapper<WorkRequirementAttachment> deleteWrapper = new LambdaQueryWrapper<>();
+            deleteWrapper.in(WorkRequirementAttachment::getId, attachmentIds);
+            attachmentMapper.delete(deleteWrapper);
+        }
+        attachments.stream()
+                .map(WorkRequirementAttachment::getFilePath)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .forEach(attachmentStorageService::deleteStoredFileQuietly);
+    }
+
+    private List<Long> sanitizeExistingAttachmentIds(List<Long> existingAttachmentIds) {
+        if (existingAttachmentIds == null || existingAttachmentIds.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> uniqueIds = existingAttachmentIds.stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return List.copyOf(uniqueIds);
+    }
+
+    private List<WorkRequirementAttachmentStorageService.TempUploadMeta> resolveNewAttachments(List<String> newAttachmentTokens) {
+        if (newAttachmentTokens == null || newAttachmentTokens.isEmpty()) {
+            return List.of();
+        }
+        Set<String> uniqueTokens = newAttachmentTokens.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<WorkRequirementAttachmentStorageService.TempUploadMeta> attachments = new ArrayList<>(uniqueTokens.size());
+        for (String token : uniqueTokens) {
+            attachments.add(attachmentStorageService.consumeTempUpload(token));
+        }
+        return attachments;
+    }
+
     private String statusLabel(int status) {
         return switch (status) {
             case STATUS_PENDING -> "待接受";
@@ -857,6 +966,24 @@ public class WorkRequirementService {
             case STATUS_RETURNED -> "已驳回";
             default -> "未知";
         };
+    }
+
+    public static class AttachmentDownload {
+        private final String fileName;
+        private final String storedPath;
+
+        public AttachmentDownload(String fileName, String storedPath) {
+            this.fileName = fileName;
+            this.storedPath = storedPath;
+        }
+
+        public String getFileName() {
+            return fileName;
+        }
+
+        public String getStoredPath() {
+            return storedPath;
+        }
     }
 
     @lombok.Data

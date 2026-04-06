@@ -5,6 +5,7 @@ import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.example.back.common.exception.BusinessException;
 import org.example.back.common.util.CodeGenerator;
+import org.example.back.common.util.PasswordPolicyUtil;
 import org.example.back.dto.LoginRequest;
 import org.example.back.dto.LoginResponse;
 import org.example.back.dto.RegisterRequest;
@@ -88,6 +89,8 @@ public class AuthService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void register(RegisterRequest request) {
+        PasswordPolicyUtil.validateUserPassword(request.getPassword(), "密码");
+
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SysUser::getUsername, request.getUsername());
         if (sysUserMapper.selectCount(queryWrapper) > 0) {

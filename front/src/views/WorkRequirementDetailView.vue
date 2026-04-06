@@ -94,8 +94,8 @@
               <el-image
                 v-for="att in info.attachments"
                 :key="att.id"
-                :src="normalizeUploadUrl(att.filePath)"
-                :preview-src-list="info.attachments.map(a => normalizeUploadUrl(a.filePath))"
+                :src="getAttachmentUrl(att)"
+                :preview-src-list="getImagePreviewList(info.attachments)"
                 preview-teleported
                 fit="cover"
                 style="width: 96px; height: 96px; margin-right: 8px; border-radius: 6px;"
@@ -125,8 +125,8 @@
             <el-image
               v-for="att in info.attachments"
               :key="att.id"
-              :src="normalizeUploadUrl(att.filePath)"
-              :preview-src-list="info.attachments.map(a => normalizeUploadUrl(a.filePath))"
+              :src="getAttachmentUrl(att)"
+              :preview-src-list="getImagePreviewList(info.attachments)"
               preview-teleported
               fit="cover"
               style="width: 80px; height: 80px; margin-right: 8px; border-radius: 4px;"
@@ -143,12 +143,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { getToken } from '@/utils/auth'
 import {
+  downloadWorkRequirementAttachmentAPI,
   getWorkRequirementAssignDetailAPI,
   acceptWorkRequirementAPI,
   rejectWorkRequirementAPI,
@@ -163,9 +164,11 @@ const loading = ref(false)
 const info = ref({})
 
 const submitFormRef = ref(null)
-const submitForm = reactive({ executeResult: '', attachmentPaths: [] })
+const submitForm = reactive({ executeResult: '', existingAttachmentIds: [], newAttachmentTokens: [] })
 const submitRules = { executeResult: [{ required: true, message: '请描述执行结果', trigger: 'blur' }] }
 const fileList = ref([])
+const attachmentObjectUrls = ref({})
+const tempUploadObjectUrls = new Map()
 const uploadUrl = '/api/upload/image'
 const uploadHeaders = computed(() => {
   const token = getToken()
@@ -197,21 +200,56 @@ const fmtTime = (val) => {
   return String(val).replace('T', ' ').substring(0, 19)
 }
 
-const normalizeUploadUrl = (path) => {
-  if (!path) return ''
-  if (/^https?:\/\//i.test(path)) return path
-  if (path.startsWith('/api/uploads/')) return path
-  if (path.startsWith('/uploads/')) return `/api${path}`
-  return path
+const revokePersistedAttachmentUrls = () => {
+  Object.values(attachmentObjectUrls.value).forEach((url) => {
+    if (url) URL.revokeObjectURL(url)
+  })
+  attachmentObjectUrls.value = {}
+}
+
+const revokeTempUploadUrls = () => {
+  tempUploadObjectUrls.forEach((url) => {
+    if (url) URL.revokeObjectURL(url)
+  })
+  tempUploadObjectUrls.clear()
+}
+
+const getAttachmentUrl = (attachment) => {
+  if (!attachment) return ''
+  return attachmentObjectUrls.value[attachment.id] || ''
+}
+
+const getImagePreviewList = (attachments = []) => attachments
+  .filter((attachment) => isImage(attachment.fileName))
+  .map((attachment) => getAttachmentUrl(attachment))
+  .filter(Boolean)
+
+const loadAttachmentUrls = async (attachments = []) => {
+  revokePersistedAttachmentUrls()
+  if (!attachments.length) return
+  const nextUrls = {}
+  await Promise.all(attachments.map(async (attachment) => {
+    if (!attachment?.id) return
+    try {
+      const blob = await downloadWorkRequirementAttachmentAPI(attachment.id)
+      nextUrls[attachment.id] = URL.createObjectURL(blob)
+    } catch {
+      nextUrls[attachment.id] = ''
+    }
+  }))
+  attachmentObjectUrls.value = nextUrls
 }
 
 const syncSubmitState = () => {
   submitForm.executeResult = info.value.executeResult || ''
-  submitForm.attachmentPaths = (info.value.attachments || []).map(item => item.filePath)
+  submitForm.existingAttachmentIds = (info.value.attachments || []).map(item => item.id).filter(Boolean)
+  submitForm.newAttachmentTokens = []
+  revokeTempUploadUrls()
   fileList.value = (info.value.attachments || []).map(item => ({
     name: item.fileName,
-    url: normalizeUploadUrl(item.filePath),
-    rawPath: item.filePath
+    url: getAttachmentUrl(item),
+    persistedId: item.id,
+    status: 'success'
   }))
 }
 
@@ -225,6 +263,7 @@ const loadDetail = async () => {
     const res = await getWorkRequirementAssignDetailAPI(assignId.value)
     if (res.code !== 200) throw new Error(res.msg || '加载失败')
     info.value = res.data || {}
+    await loadAttachmentUrls(info.value.attachments || [])
     syncSubmitState()
   } catch (e) {
     ElMessage.error(e.message || '加载失败')
@@ -260,20 +299,32 @@ const handleReject = () => {
 }
 
 const handleUploadSuccess = (response, file) => {
-  if (response.code === 200) {
-    submitForm.attachmentPaths.push(response.data)
-    file.rawPath = response.data
-    file.url = normalizeUploadUrl(response.data)
+  if (response.code === 200 && response.data?.token) {
+    submitForm.newAttachmentTokens.push(response.data.token)
+    file.uploadToken = response.data.token
+    if (file.raw) {
+      const previewUrl = URL.createObjectURL(file.raw)
+      tempUploadObjectUrls.set(response.data.token, previewUrl)
+      file.url = previewUrl
+    }
     return
   }
   ElMessage.error(response.msg || '上传失败')
 }
 
 const handleUploadRemove = (file) => {
-  const rawPath = file.rawPath || file.response?.data || file.url
-  const index = submitForm.attachmentPaths.indexOf(rawPath)
-  if (index !== -1) {
-    submitForm.attachmentPaths.splice(index, 1)
+  if (file.persistedId) {
+    submitForm.existingAttachmentIds = submitForm.existingAttachmentIds.filter((id) => id !== file.persistedId)
+    return
+  }
+  const token = file.uploadToken || file.response?.data?.token
+  if (token) {
+    submitForm.newAttachmentTokens = submitForm.newAttachmentTokens.filter((item) => item !== token)
+    const previewUrl = tempUploadObjectUrls.get(token)
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      tempUploadObjectUrls.delete(token)
+    }
   }
 }
 
@@ -283,7 +334,8 @@ const handleSubmit = () => {
     try {
       const res = await submitWorkRequirementAPI(assignId.value, {
         executeResult: submitForm.executeResult,
-        attachmentPaths: submitForm.attachmentPaths
+        existingAttachmentIds: submitForm.existingAttachmentIds,
+        newAttachmentTokens: submitForm.newAttachmentTokens
       })
       if (res.code !== 200) throw new Error(res.msg || '提交失败')
       ElMessage.success('提交成功，等待审核')
@@ -296,6 +348,11 @@ const handleSubmit = () => {
 
 onMounted(() => {
   loadDetail()
+})
+
+onBeforeUnmount(() => {
+  revokePersistedAttachmentUrls()
+  revokeTempUploadUrls()
 })
 </script>
 

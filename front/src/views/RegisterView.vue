@@ -104,6 +104,20 @@ const submitting = ref(false)
 const deptOptions = ref([])
 
 const form = reactive({ username: '', realName: '', password: '', confirmPassword: '', deptId: null })
+const validatePasswordStrength = (rule, value, callback) => {
+  if (value === '') {
+    callback(new Error('密码不可为空'))
+    return
+  }
+  if (value.length < 8 || !/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+    callback(new Error('密码至少8位，且需同时包含字母和数字'))
+    return
+  }
+  if (form.confirmPassword) {
+    formRef.value?.validateField('confirmPassword')
+  }
+  callback()
+}
 const validatePass = (rule, value, callback) => {
   if (value === '') { callback(new Error('请再次输入密码')) }
   else if (value !== form.password) { callback(new Error('两次输入密码不一致!')) }
@@ -112,7 +126,7 @@ const validatePass = (rule, value, callback) => {
 const rules = {
   username: [{ required: true, message: '账号不可为空', trigger: 'blur' }],
   realName: [{ required: true, message: '真实姓名不可为空', trigger: 'blur' }],
-  password: [{ required: true, message: '密码不可为空', trigger: 'blur' }],
+  password: [{ validator: validatePasswordStrength, trigger: 'blur' }],
   confirmPassword: [{ validator: validatePass, trigger: 'blur' }],
   deptId: [{ required: true, message: '请选择所属部门', trigger: 'change' }]
 }

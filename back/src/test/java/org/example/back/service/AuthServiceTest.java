@@ -17,9 +17,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,7 +45,7 @@ class AuthServiceTest {
     void register_shouldCreateUserAndEmployeeProfile() {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("new_employee");
-        request.setPassword("123456");
+        request.setPassword("abc12345");
         request.setRealName("新员工");
         request.setDeptId(2L);
 
@@ -70,7 +72,7 @@ class AuthServiceTest {
         assertEquals("employee", savedUser.getRole());
         assertEquals(2L, savedUser.getDeptId());
         assertEquals(1, savedUser.getStatus());
-        assertTrue(BCrypt.checkpw("123456", savedUser.getPassword()));
+        assertTrue(BCrypt.checkpw("abc12345", savedUser.getPassword()));
 
         ArgumentCaptor<SysEmployee> employeeCaptor = ArgumentCaptor.forClass(SysEmployee.class);
         verify(sysEmployeeMapper, times(1)).insert(employeeCaptor.capture());
@@ -88,7 +90,7 @@ class AuthServiceTest {
     void register_shouldRejectNonApprovedDept() {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("pending_user");
-        request.setPassword("123456");
+        request.setPassword("abc12345");
         request.setRealName("待审批员工");
         request.setDeptId(9L);
 
@@ -104,5 +106,24 @@ class AuthServiceTest {
                 org.example.back.common.exception.BusinessException.class,
                 () -> authService.register(request)
         );
+    }
+
+    @Test
+    void register_shouldRejectWeakPassword() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("weak_employee");
+        request.setPassword("12345678");
+        request.setRealName("弱密码员工");
+        request.setDeptId(2L);
+
+        org.example.back.common.exception.BusinessException ex = assertThrows(
+                org.example.back.common.exception.BusinessException.class,
+                () -> authService.register(request)
+        );
+
+        assertEquals(400, ex.getCode());
+        assertEquals("密码至少8位，且需同时包含字母和数字", ex.getMsg());
+        verify(sysUserMapper, never()).insert(any(SysUser.class));
+        verify(sysEmployeeMapper, never()).insert(any(SysEmployee.class));
     }
 }

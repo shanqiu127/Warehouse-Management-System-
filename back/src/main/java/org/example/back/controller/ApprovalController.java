@@ -29,6 +29,7 @@ public class ApprovalController {
     private ApprovalService approvalService;
 
     @PostMapping
+    @RequireAdmin("仅管理员可提交作废审批申请")
     @PreventDuplicateSubmit(intervalMs = 1200, message = "请勿重复提交审批申请")
     public Result<Void> create(@Valid @RequestBody ApprovalCreateDTO dto) {
         approvalService.create(dto);

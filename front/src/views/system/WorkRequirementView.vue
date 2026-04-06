@@ -167,13 +167,13 @@
               <div v-for="att in row.attachments" :key="att.id" class="attachment-item">
                 <el-image
                   v-if="isImage(att.fileName)"
-                  :src="normalizeUploadUrl(att.filePath)"
-                  :preview-src-list="row.attachments.filter(a => isImage(a.fileName)).map(a => normalizeUploadUrl(a.filePath))"
+                  :src="getAttachmentUrl(att)"
+                  :preview-src-list="getImagePreviewList(row.attachments)"
                   preview-teleported
                   fit="cover"
                   style="width: 40px; height: 40px; margin-right: 4px; cursor: pointer;"
                 />
-                <a v-else :href="normalizeUploadUrl(att.filePath)" target="_blank" class="attachment-link">{{ att.fileName }}</a>
+                <a v-else :href="getAttachmentUrl(att)" target="_blank" class="attachment-link">{{ att.fileName }}</a>
               </div>
             </template>
             <span v-else style="color: #999;">-</span>
@@ -194,9 +194,10 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  downloadWorkRequirementAttachmentAPI,
   getWorkRequirementPageAPI,
   getWorkRequirementDetailAPI,
   createWorkRequirementAPI,
@@ -224,6 +225,7 @@ const employeeOptions = ref([])
 
 const detailDialogVisible = ref(false)
 const detail = ref({})
+const attachmentObjectUrls = ref({})
 
 const createRules = {
   content: [{ required: true, message: '请输入工作内容', trigger: 'blur' }],
@@ -293,12 +295,38 @@ const overdueTagType = (label) => {
 
 const isImage = (name) => /\.(jpe?g|png|gif|webp|bmp)$/i.test(name || '')
 
-const normalizeUploadUrl = (path) => {
-  if (!path) return ''
-  if (/^https?:\/\//i.test(path)) return path
-  if (path.startsWith('/api/uploads/')) return path
-  if (path.startsWith('/uploads/')) return `/api${path}`
-  return path
+const revokeAttachmentUrls = () => {
+  Object.values(attachmentObjectUrls.value).forEach((url) => {
+    if (url) URL.revokeObjectURL(url)
+  })
+  attachmentObjectUrls.value = {}
+}
+
+const getAttachmentUrl = (attachment) => {
+  if (!attachment) return ''
+  return attachmentObjectUrls.value[attachment.id] || ''
+}
+
+const getImagePreviewList = (attachments = []) => attachments
+  .filter((attachment) => isImage(attachment.fileName))
+  .map((attachment) => getAttachmentUrl(attachment))
+  .filter(Boolean)
+
+const loadAttachmentUrls = async (detailData = {}) => {
+  revokeAttachmentUrls()
+  const attachments = (detailData.assigns || []).flatMap((assign) => assign.attachments || [])
+  if (!attachments.length) return
+  const nextUrls = {}
+  await Promise.all(attachments.map(async (attachment) => {
+    if (!attachment?.id) return
+    try {
+      const blob = await downloadWorkRequirementAttachmentAPI(attachment.id)
+      nextUrls[attachment.id] = URL.createObjectURL(blob)
+    } catch {
+      nextUrls[attachment.id] = ''
+    }
+  }))
+  attachmentObjectUrls.value = nextUrls
 }
 
 const loadList = async () => {
@@ -372,6 +400,7 @@ const handleDetail = async (row) => {
     const res = await getWorkRequirementDetailAPI(row.id)
     if (res.code !== 200) throw new Error(res.msg || '详情加载失败')
     detail.value = res.data || {}
+    await loadAttachmentUrls(detail.value)
     detailDialogVisible.value = true
   } catch (e) {
     ElMessage.error(e.message || '详情加载失败')
@@ -410,7 +439,10 @@ const handleReview = (assignRow, approved) => {
         getWorkRequirementDetailAPI(detail.value.id),
         loadList()
       ])
-      if (detailRes.code === 200) detail.value = detailRes.data || {}
+      if (detailRes.code === 200) {
+        detail.value = detailRes.data || {}
+        await loadAttachmentUrls(detail.value)
+      }
     } catch (e) {
       ElMessage.error(e.message || '审核失败')
     }
@@ -418,6 +450,10 @@ const handleReview = (assignRow, approved) => {
 }
 
 onMounted(() => { loadList() })
+
+onBeforeUnmount(() => {
+  revokeAttachmentUrls()
+})
 </script>
 
 <style scoped>

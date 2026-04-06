@@ -51,7 +51,6 @@ public class ApprovalService {
     private static final String ACTION_VOID = "void";
     private static final String ACTION_VOID_RED = "void_red";
 
-    private static final String ROLE_EMPLOYEE = "employee";
     private static final String ROLE_ADMIN = "admin";
     private static final int APPROVAL_TEXT_MAX_LEN = 200;
 
@@ -380,11 +379,8 @@ public class ApprovalService {
     }
 
     private void ensureRequesterCanSubmitApproval(LoginResponse.UserInfoVO requester, String role, String bizType) {
-        if (ROLE_EMPLOYEE.equals(role)) {
-            return;
-        }
         if (!ROLE_ADMIN.equals(role)) {
-            throw BusinessException.forbidden("当前角色无权提交作废审批申请");
+            throw BusinessException.forbidden("仅采购或销售部门管理员可提交该类作废审批申请");
         }
 
         String deptCode = authzService.normalizeDeptCode(requester.getDeptCode());

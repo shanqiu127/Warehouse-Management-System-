@@ -16,3 +16,4 @@ export const getWorkRequirementAssignDetailAPI = (assignId) => request.get(`/hom
 export const acceptWorkRequirementAPI = (assignId) => request.put(`/home/work-requirements/${assignId}/accept`)
 export const rejectWorkRequirementAPI = (assignId) => request.put(`/home/work-requirements/${assignId}/reject`)
 export const submitWorkRequirementAPI = (assignId, data) => request.put(`/home/work-requirements/${assignId}/submit`, data)
+export const downloadWorkRequirementAttachmentAPI = (attachmentId) => request.get(`/upload/work-requirement/attachments/${attachmentId}`, { responseType: 'blob' })

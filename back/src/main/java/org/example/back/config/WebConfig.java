@@ -7,7 +7,6 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 
 /**
  * Web MVC 配置类
@@ -18,9 +17,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Autowired
     private LoginIpWhitelistInterceptor loginIpWhitelistInterceptor;
-
-    @Value("${app.upload.base-path:./uploads}")
-    private String uploadBasePath;
 
     /**
      * 配置 CORS 跨域
@@ -53,10 +49,6 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/webjars/**")
                 .addResourceLocations("classpath:/META-INF/resources/webjars/");
 
-        // 上传文件静态资源映射
-        String uploadLocation = "file:" + java.nio.file.Paths.get(uploadBasePath).toAbsolutePath().normalize() + "/";
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations(uploadLocation);
     }
 
     @Override

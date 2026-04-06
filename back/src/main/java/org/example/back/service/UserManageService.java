@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.example.back.common.exception.BusinessException;
 import org.example.back.common.result.PageResult;
 import org.example.back.common.util.CodeGenerator;
+import org.example.back.common.util.PasswordPolicyUtil;
 import org.example.back.dto.LoginResponse;
 import org.example.back.dto.UserQueryDTO;
 import org.example.back.dto.UserSaveDTO;
@@ -176,9 +177,7 @@ public class UserManageService {
     }
 
     public void resetPassword(Long targetUserId, String newPassword) {
-        if (!StringUtils.hasText(newPassword) || newPassword.length() < 6) {
-            throw BusinessException.validateFail("新密码至少 6 位");
-        }
+        PasswordPolicyUtil.validateUserPassword(newPassword, "新密码");
 
         SysUser operator = requireCurrentUser();
         SysUser targetUser = requireManageableUser(targetUserId);

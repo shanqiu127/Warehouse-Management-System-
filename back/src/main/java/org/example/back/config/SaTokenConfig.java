@@ -31,8 +31,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
             "/webjars/**",              // Swagger WebJars
             "/doc.html",                // Knife4j 文档
             "/favicon.ico",             // 网站图标
-            "/error",                   // 错误页面
-            "/uploads/**"               // 上传文件静态资源
+                "/error"                    // 错误页面
     );
 
     @Override
