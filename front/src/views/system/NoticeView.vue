@@ -15,25 +15,25 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="handleSearch">查询</el-button>
-        <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd">新增公告</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+        <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
+        <el-button type="success" :icon="Plus" @click="handleAdd">新增公告</el-button>
       </el-form-item>
     </el-form>
 
     <el-table v-loading="loading" :data="tableData" border style="width: 100%">
       <el-table-column type="index" label="序号" width="60" />
-      <el-table-column prop="title" label="公告标题" min-width="180" />
-      <el-table-column label="受众" min-width="160">
+      <el-table-column prop="title" label="公告标题" min-width="160" />
+      <el-table-column label="受众" min-width="130">
         <template #default="scope">{{ audienceLabel(scope.row) }}</template>
       </el-table-column>
-      <el-table-column prop="date" label="发布时间" width="180" />
-      <el-table-column prop="author" label="发布人" width="120" />
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column prop="date" label="发布时间" width="165" />
+      <el-table-column prop="author" label="发布人" width="100" />
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="scope">
-          <el-button size="small" @click="handleView(scope.row)">查看</el-button>
-          <el-button size="small" type="primary" :disabled="!canManage(scope.row)" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" type="danger" :disabled="!canManage(scope.row)" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button size="small" :icon="View" @click="handleView(scope.row)">查看</el-button>
+          <el-button size="small" type="primary" :icon="Edit" :disabled="!canManage(scope.row)" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-button size="small" type="danger" :icon="Delete" :disabled="!canManage(scope.row)" @click="handleDelete(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -91,8 +91,8 @@
         </el-form-item>
       </el-form>
       <template #footer v-if="!isView">
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave">确认</el-button>
+        <el-button :icon="Close" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :icon="Check" @click="handleSave">确认</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -101,6 +101,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, View, Edit, Delete, Close, Check } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { isSuperAdmin } from '@/utils/auth'
 import {

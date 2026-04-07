@@ -15,8 +15,8 @@
         </el-select>
       </el-form-item>
       <el-form-item class="search-actions">
-        <el-button type="primary" @click="handleSearch">查询</el-button>
-        <el-button @click="resetSearch">重置</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+        <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
       </el-form-item>
     </el-form>
 
@@ -47,6 +47,7 @@
             size="small"
             type="success"
             link
+            :icon="Select"
             @click="handleApprove(scope.row)"
           >
             通过
@@ -56,6 +57,7 @@
             size="small"
             type="danger"
             link
+            :icon="CloseBold"
             @click="handleReject(scope.row)"
           >
             驳回
@@ -82,6 +84,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Select, CloseBold } from '@element-plus/icons-vue'
 import { approveDeptAPI, getDeptPageAPI, rejectDeptAPI } from '@/api/system'
 
 const searchForm = reactive({

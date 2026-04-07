@@ -19,16 +19,16 @@
         <el-input v-model="searchForm.keyword" placeholder="搜索内容" clearable />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="handleSearch">查询</el-button>
-        <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd">发布工作要求</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+        <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
+        <el-button type="success" :icon="Plus" @click="handleAdd">发布工作要求</el-button>
       </el-form-item>
     </el-form>
 
     <el-table v-loading="loading" :data="tableData" border style="width: 100%">
       <el-table-column type="index" label="序号" width="60" />
-      <el-table-column prop="content" label="内容" min-width="200" show-overflow-tooltip />
-      <el-table-column label="时间范围" min-width="200">
+      <el-table-column prop="content" label="内容" min-width="180" show-overflow-tooltip />
+      <el-table-column label="时间范围" min-width="180">
         <template #default="{ row }">{{ fmtTime(row.startTime) }} ~ {{ fmtTime(row.endTime) }}</template>
       </el-table-column>
       <el-table-column prop="targetScope" label="下达范围" width="100">
@@ -44,13 +44,13 @@
           <el-tag :type="statusTagType(row.summaryStatus)" size="small">{{ row.summaryStatus }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="createTime" label="创建时间" width="170">
+      <el-table-column prop="createTime" label="创建时间" width="160">
         <template #default="{ row }">{{ fmtTime(row.createTime) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="160" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="handleDetail(row)">详情</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+          <el-button size="small" :icon="ViewIcon" @click="handleDetail(row)">详情</el-button>
+          <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -129,8 +129,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleCreate">确认发布</el-button>
+        <el-button :icon="Close" @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :icon="Check" @click="handleCreate">确认发布</el-button>
       </template>
     </el-dialog>
 
@@ -196,6 +196,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, View as ViewIcon, Delete, Close, Check } from '@element-plus/icons-vue'
 import {
   downloadWorkRequirementAttachmentAPI,
   getWorkRequirementPageAPI,

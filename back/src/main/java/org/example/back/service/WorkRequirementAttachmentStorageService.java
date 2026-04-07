@@ -150,7 +150,6 @@ public class WorkRequirementAttachmentStorageService {
         return resolved;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, TempUploadMeta> getTempUploads() {
         Object sessionValue = StpUtil.getSession().get(SESSION_KEY_TEMP_UPLOADS);
         if (sessionValue instanceof Map<?, ?> sessionMap) {

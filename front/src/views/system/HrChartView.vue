@@ -6,7 +6,7 @@
         <h1>员工分布图表</h1>
         <p class="hero-desc">当前统计各部门在岗人员，包含员工、管理员以及超级管理员；超级管理员只有1人(归入系统管理部)。</p>
       </div>
-      <el-button type="primary" :loading="loading" @click="loadData">刷新统计</el-button>
+      <el-button type="primary" :icon="Refresh" :loading="loading" @click="loadData">刷新统计</el-button>
     </section>
 
     <section class="summary-grid">
@@ -70,6 +70,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { getHrEmployeeDistributionAPI } from '@/api/hr'
 import { loadECharts } from '@/utils/echartsLoader'
 

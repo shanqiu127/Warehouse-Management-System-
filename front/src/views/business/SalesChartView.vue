@@ -111,8 +111,8 @@
           ></el-date-picker>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="loading" @click="fetchData">查询统计</el-button>
-          <el-button :disabled="loading" @click="resetData">重置</el-button>
+          <el-button type="primary" :icon="Search" :loading="loading" @click="fetchData">查询统计</el-button>
+          <el-button :icon="Refresh" :disabled="loading" @click="resetData">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -143,6 +143,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Search, Refresh } from '@element-plus/icons-vue'
 import { loadECharts } from '@/utils/echartsLoader'
 import { useUserStore } from '@/stores/user'
 import { normalizeDeptCode } from '@/utils/auth'

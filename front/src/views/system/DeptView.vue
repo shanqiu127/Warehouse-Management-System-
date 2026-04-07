@@ -5,9 +5,9 @@
         <el-input v-model="searchForm.deptName" placeholder="请输入部门名称" clearable />
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="handleSearch">查询</el-button>
-        <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd">新增部门</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+        <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
+        <el-button type="success" :icon="Plus" @click="handleAdd">新增部门</el-button>
       </el-form-item>
     </el-form>
 
@@ -19,7 +19,7 @@
       <el-table-column prop="createTime" label="创建时间" />
       <el-table-column label="操作状态" width="150" fixed="right">
         <template #default="scope">
-          <el-button v-if="canEditDept(scope.row)" size="small" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-button v-if="canEditDept(scope.row)" size="small" type="primary" :icon="Edit" @click="handleEdit(scope.row)">编辑</el-button>
           <el-tag v-else :type="getDeptStatusType(scope.row)">{{ getDeptStatusLabel(scope.row) }}</el-tag>
         </template>
       </el-table-column>
@@ -53,8 +53,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave">{{ saveButtonText }}</el-button>
+        <el-button :icon="Close" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :icon="Check" @click="handleSave">{{ saveButtonText }}</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -63,6 +63,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Search, Refresh, Plus, Edit, Close, Check } from '@element-plus/icons-vue'
 import {
   createDeptAPI,
   getDeptDetailAPI,

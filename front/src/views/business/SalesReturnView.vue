@@ -23,9 +23,9 @@
             />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="handleSearch">查询</el-button>
-            <el-button @click="resetSearch">重置</el-button>
-            <el-button v-permission="{ roles: ['admin'], deptCodes: ['sales'] }" type="warning" @click="handleAdd">新建销售退货单</el-button>
+            <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+            <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
+            <el-button v-permission="{ roles: ['admin'], deptCodes: ['sales'] }" type="warning" :icon="Plus" @click="handleAdd">新建销售退货单</el-button>
           </el-form-item>
         </el-form>
       </div>
@@ -43,7 +43,7 @@
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="scope">
             <div class="action-group">
-              <el-button size="small" type="primary" link @click="handleView(scope.row)">查看</el-button>
+              <el-button size="small" type="primary" link :icon="ViewIcon" @click="handleView(scope.row)">查看</el-button>
               <el-button
                 v-if="showDeleteAction(scope.row)"
                 v-permission="{ roles: ['admin'], deptCodes: ['sales'] }"
@@ -145,8 +145,8 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button v-if="dialogType !== 'view'" type="primary" @click="submitForm">确定新增</el-button>
+          <el-button :icon="Close" @click="dialogVisible = false">取消</el-button>
+          <el-button v-if="dialogType !== 'view'" type="primary" :icon="Check" @click="submitForm">确定新增</el-button>
         </span>
       </template>
     </el-dialog>
@@ -156,7 +156,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { QuestionFilled } from '@element-plus/icons-vue'
+import { QuestionFilled, Search, Refresh, Plus, View as ViewIcon, Delete, DocumentRemove, DocumentDelete, Close, Check } from '@element-plus/icons-vue'
 import { createApprovalOrderAPI } from '@/api/system'
 import { hasBizDocumentWorkflowState, isBizDocumentDeleted, resolveBizDocumentState } from '@/utils/bizDocumentState'
 import {

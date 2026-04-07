@@ -43,22 +43,22 @@
       <article class="nav-card" @click="go('/system/dept-approval')">
         <h3>部门审批</h3>
         <p>审核人事提交的新部门请求，并决定是否正式生效。</p>
-        <el-button type="primary" text>进入页面</el-button>
+        <el-button type="primary" text :icon="Stamp">进入页面</el-button>
       </article>
       <article class="nav-card" @click="go('/system/security-ip-policy')">
         <h3>安全策略</h3>
         <p>维护 IP 白名单策略，控制登录入口边界。</p>
-        <el-button type="primary" text>进入页面</el-button>
+        <el-button type="primary" text :icon="Lock">进入页面</el-button>
       </article>
       <article class="nav-card" @click="go('/system/login-log')">
         <h3>登录日志</h3>
         <p>查看成功与失败登录记录，快速追踪异常来源。</p>
-        <el-button type="primary" text>进入页面</el-button>
+        <el-button type="primary" text :icon="Notebook">进入页面</el-button>
       </article>
       <article class="nav-card" @click="go('/system/operation-log')">
         <h3>操作日志</h3>
         <p>审计关键业务动作，确保每次变更可回溯。</p>
-        <el-button type="primary" text>进入页面</el-button>
+        <el-button type="primary" text :icon="Document">进入页面</el-button>
       </article>
     </section>
 
@@ -67,7 +67,7 @@
         <template #header>
           <div class="table-head">
             <span>最新操作日志</span>
-            <el-button type="primary" text @click="go('/system/operation-log')">查看全部</el-button>
+            <el-button type="primary" text :icon="ArrowRight" @click="go('/system/operation-log')">查看全部</el-button>
           </div>
         </template>
         <el-table :data="recentOperations" size="small" stripe empty-text="暂无操作日志">
@@ -88,6 +88,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowRight, Stamp, Lock, Notebook, Document } from '@element-plus/icons-vue'
 import { getEnabledIpPoliciesAPI, getIpPolicyPageAPI } from '@/api/security'
 import { getLoginLogPageAPI, getOperationLogPageAPI } from '@/api/audit'
 import { getDeptPageAPI } from '@/api/system'

@@ -21,25 +21,25 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="handleSearch">查询</el-button>
-        <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd">新增用户</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+        <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
+        <el-button type="success" :icon="Plus" @click="handleAdd">新增用户</el-button>
       </el-form-item>
     </el-form>
 
     <el-table :data="tableData" border style="width: 100%" v-loading="loading">
       <el-table-column type="index" label="序号" width="60" />
-      <el-table-column prop="username" label="用户名" min-width="120" />
-      <el-table-column prop="realName" label="真实姓名" min-width="120" />
-      <el-table-column v-if="showDeptColumn" prop="deptName" label="所属部门" min-width="120" />
-      <el-table-column v-if="isSuperAdminUser" prop="role" label="角色" width="120">
+      <el-table-column prop="username" label="用户名" min-width="100" />
+      <el-table-column prop="realName" label="真实姓名" min-width="100" />
+      <el-table-column v-if="showDeptColumn" prop="deptName" label="所属部门" min-width="100" />
+      <el-table-column v-if="isSuperAdminUser" prop="role" label="角色" width="100">
         <template #default="scope">
           <el-tag :type="scope.row.role === 'superadmin' ? 'danger' : (scope.row.role === 'admin' ? 'warning' : 'info')">
             {{ roleLabel(scope.row.role) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="status" label="状态" width="120">
+      <el-table-column prop="status" label="状态" width="100">
         <template #default="scope">
           <el-switch
             :model-value="scope.row.status"
@@ -50,13 +50,13 @@
           />
         </template>
       </el-table-column>
-      <el-table-column prop="phone" label="手机号" width="150" />
-      <el-table-column prop="email" label="邮箱" min-width="180" />
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column prop="phone" label="手机号" width="130" />
+      <el-table-column prop="email" label="邮箱" min-width="150" />
+      <el-table-column label="操作" width="310" fixed="right">
         <template #default="scope">
-          <el-button size="small" type="primary" :disabled="!canManageRow(scope.row)" @click="handleEdit(scope.row)">编辑</el-button>
-          <el-button size="small" :disabled="!canResetPassword(scope.row)" @click="handleResetPassword(scope.row)">设置密码</el-button>
-          <el-button size="small" type="danger" :disabled="!canManageRow(scope.row)" @click="handleDelete(scope.row)">删除</el-button>
+          <el-button size="small" type="primary" :icon="Edit" :disabled="!canManageRow(scope.row)" @click="handleEdit(scope.row)">编辑</el-button>
+          <el-button size="small" :icon="Key" :disabled="!canResetPassword(scope.row)" @click="handleResetPassword(scope.row)">设置密码</el-button>
+          <el-button size="small" type="danger" :icon="Delete" :disabled="!canManageRow(scope.row)" @click="handleDelete(scope.row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -105,8 +105,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave">确认</el-button>
+        <el-button :icon="Close" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :icon="Check" @click="handleSave">确认</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -115,6 +115,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, Edit, Delete, Key, Close, Check } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { isSuperAdmin } from '@/utils/auth'
 import {

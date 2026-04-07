@@ -24,8 +24,8 @@
             <p class="drawer-desc">逐条已读，支持一键已读和删除全部已读。</p>
           </div>
           <div class="drawer-action-row">
-            <el-button link type="primary" :disabled="!unreadCount || actionLoading" @click="handleReadAll">一键已读</el-button>
-            <el-button link type="danger" :disabled="!hasReadMessages || actionLoading" @click="handleDeleteRead">删除全部已读</el-button>
+            <el-button link type="primary" :icon="Finished" :disabled="!unreadCount || actionLoading" @click="handleReadAll">一键已读</el-button>
+            <el-button link type="danger" :icon="Delete" :disabled="!hasReadMessages || actionLoading" @click="handleDeleteRead">删除全部已读</el-button>
           </div>
         </div>
 
@@ -42,7 +42,7 @@
               <p class="message-content">{{ item.content }}</p>
               <div class="message-card-foot">
                 <span>{{ item.read ? `已读于 ${formatTime(item.readTime)}` : '等待处理' }}</span>
-                <el-button link type="primary" :disabled="item.read || actionLoading" @click="handleRead(item)">标记已读</el-button>
+                <el-button link type="primary" :icon="Check" :disabled="item.read || actionLoading" @click="handleRead(item)">标记已读</el-button>
               </div>
             </article>
           </div>
@@ -56,6 +56,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Finished, Delete, Check } from '@element-plus/icons-vue'
 import {
   deleteAllReadMessagesAPI,
   getMessagePageAPI,

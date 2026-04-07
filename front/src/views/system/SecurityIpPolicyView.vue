@@ -12,7 +12,7 @@
             <p class="kicker">SECURITY POLICY</p>
             <h2>IP 白名单策略</h2>
           </div>
-          <el-button type="primary" @click="handleAdd">新增策略</el-button>
+          <el-button type="primary" :icon="Plus" @click="handleAdd">新增策略</el-button>
         </div>
       </template>
 
@@ -33,8 +33,8 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+          <el-button :icon="Refresh" @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
 
@@ -57,14 +57,14 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="updateTime" label="更新时间" width="180">
+        <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="updateTime" label="更新时间" width="165">
           <template #default="scope">{{ formatTime(scope.row.updateTime) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
-            <el-button text type="primary" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button text type="danger" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button text type="primary" :icon="Edit" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button text type="danger" :icon="Delete" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -110,8 +110,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
+        <el-button :icon="Close" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :icon="Check" :loading="saving" @click="submitForm">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -120,6 +120,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, Edit, Delete, Close, Check } from '@element-plus/icons-vue'
 import {
   createIpPolicyAPI,
   deleteIpPolicyAPI,

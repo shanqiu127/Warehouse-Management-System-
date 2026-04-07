@@ -10,17 +10,17 @@
         </el-select>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" @click="handleSearch">查询</el-button>
-        <el-button @click="resetSearch">重置</el-button>
-        <el-button type="success" @click="handleAdd">新增员工</el-button>
+        <el-button type="primary" :icon="Search" @click="handleSearch">查询</el-button>
+        <el-button :icon="Refresh" @click="resetSearch">重置</el-button>
+        <el-button type="success" :icon="Plus" @click="handleAdd">新增员工</el-button>
       </el-form-item>
     </el-form>
 
     <el-table :data="tableData" border style="width: 100%" v-loading="loading">
-      <el-table-column prop="empCode" label="员工工号" width="120" />
-      <el-table-column prop="username" label="登录账号" width="140" />
+      <el-table-column prop="empCode" label="员工工号" width="100" />
+      <el-table-column prop="username" label="登录账号" width="120" />
       <el-table-column prop="empName" label="员工姓名" />
-      <el-table-column prop="position" label="职位" width="120" />
+      <el-table-column prop="position" label="职位" width="100" />
       <el-table-column prop="phone" label="联系电话" />
       <el-table-column prop="deptName" label="所属部门" />
       <el-table-column prop="status" label="状态" width="100">
@@ -28,14 +28,14 @@
           <el-tag :type="scope.row.status === 1 ? 'success' : 'info'">{{ scope.row.status === 1 ? '在职' : '离职' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="scope">
           <template v-if="isReadOnlyRow(scope.row)">
             <el-tag type="info">只读展示</el-tag>
           </template>
           <template v-else>
-            <el-button size="small" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button size="small" type="primary" :icon="Edit" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button size="small" type="danger" :icon="Delete" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </template>
       </el-table-column>
@@ -86,8 +86,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSave">确认</el-button>
+        <el-button :icon="Close" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :icon="Check" @click="handleSave">确认</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -96,6 +96,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Refresh, Plus, Edit, Delete, Close, Check } from '@element-plus/icons-vue'
 import {
   createEmployeeAPI,
   deleteEmployeeAPI,

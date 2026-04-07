@@ -24,10 +24,24 @@
         </article>
       </section>
 
+      <transition-group name="admin-reminder-fade" tag="div" class="admin-reminder-stack">
+        <div
+          v-if="showDeptApprovalReminder"
+          key="deptApprovalReminder"
+          class="admin-reminder admin-reminder--amber"
+          role="status"
+          aria-live="polite"
+        >
+          <button type="button" class="admin-reminder__close" aria-label="关闭提醒" @click="dismissDeptApprovalReminder">×</button>
+          <div class="admin-reminder__eyebrow">人事部门审核提醒</div>
+          <div class="admin-reminder__title">待审核任务：{{ deptApprovalReminder.count }}</div>
+          <p class="admin-reminder__text">你当前有待审核的部门审批任务，请及时处理。</p>
+        </div>
+      </transition-group>
+
       <section class="panel-card">
         <div class="panel-head">
           <h2>系统错误监控</h2>
-          <button type="button" class="audit-link" @click="go('/system/operation-log')">查看完整审计</button>
         </div>
         <div v-if="summary.recentErrorLogs?.length" class="log-list">
           <article v-for="(log, idx) in summary.recentErrorLogs" :key="idx" class="log-item">
@@ -47,17 +61,49 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getHomeSummaryAPI } from '@/api/home'
+import { getDeptPageAPI } from '@/api/system'
+import { getToken } from '@/utils/auth'
 
 const router = useRouter()
 const summary = ref({ username: '', realName: '', dbStatus: '', currentLoginTime: null, lastLoginTime: null, errorCount24h: 0, recentErrorLogs: [] })
+const deptApprovalReminder = ref({ count: 0, signature: '' })
+const dismissedDeptApprovalSignature = ref('')
+
+const DEPT_APPROVAL_REMINDER_KEY_PREFIX = 'superadmin-dept-approval-reminder'
+
+const showDeptApprovalReminder = computed(() => {
+  return Number(deptApprovalReminder.value.count) > 0
+    && dismissedDeptApprovalSignature.value !== deptApprovalReminder.value.signature
+})
 
 const formatTime = (val) => {
   if (!val) return '--'
   return String(val).replace('T', ' ').substring(0, 19)
+}
+
+const getReminderStorageKey = (userId) => {
+  const token = getToken()
+  return `${DEPT_APPROVAL_REMINDER_KEY_PREFIX}:${userId}:${token}`
+}
+
+const syncDismissedReminder = () => {
+  if (!summary.value.userId) {
+    dismissedDeptApprovalSignature.value = ''
+    return
+  }
+  dismissedDeptApprovalSignature.value = sessionStorage.getItem(getReminderStorageKey(summary.value.userId)) || ''
+}
+
+const dismissDeptApprovalReminder = () => {
+  if (!summary.value.userId || !deptApprovalReminder.value.signature) {
+    return
+  }
+  sessionStorage.setItem(getReminderStorageKey(summary.value.userId), deptApprovalReminder.value.signature)
+  dismissedDeptApprovalSignature.value = deptApprovalReminder.value.signature
 }
 
 const loadSummary = async () => {
@@ -65,16 +111,37 @@ const loadSummary = async () => {
     const res = await getHomeSummaryAPI()
     if (res.code === 200) {
       summary.value = { ...summary.value, ...res.data }
+      syncDismissedReminder()
     }
   } catch {
     ElMessage.error('首页摘要加载失败')
   }
 }
 
-const go = (path) => router.push(path)
+const loadDeptApprovalReminder = async () => {
+  try {
+    const res = await getDeptPageAPI({ pageNum: 1, pageSize: 50, status: 1 })
+    if (res.code !== 200) {
+      throw new Error(res.msg || '部门审批提醒加载失败')
+    }
+
+    const records = Array.isArray(res.data?.records) ? res.data.records : []
+    const signature = Number(res.data?.total || 0) > 0
+      ? `${Number(res.data?.total || 0)}:${records.map(item => item.id).filter(Boolean).join(',')}`
+      : ''
+
+    deptApprovalReminder.value = {
+      count: Number(res.data?.total || 0),
+      signature
+    }
+  } catch (error) {
+    ElMessage.error(error.message || '部门审批提醒加载失败')
+  }
+}
 
 onMounted(() => {
   loadSummary()
+  loadDeptApprovalReminder()
 })
 </script>
 
@@ -169,6 +236,98 @@ onMounted(() => {
   color: #0f172a;
 }
 
+.admin-reminder-stack {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 60;
+  display: grid;
+  gap: 14px;
+  pointer-events: none;
+}
+
+.admin-reminder {
+  position: relative;
+  width: min(336px, calc(100vw - 32px));
+  padding: 18px 20px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 22px 44px -24px rgba(15, 23, 42, 0.34);
+  pointer-events: auto;
+  animation: admin-reminder-float 3.4s ease-in-out infinite;
+}
+
+.admin-reminder--amber {
+  background: linear-gradient(145deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.admin-reminder__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.admin-reminder__close:hover {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+.admin-reminder__eyebrow {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.admin-reminder--amber .admin-reminder__eyebrow {
+  color: #b45309;
+}
+
+.admin-reminder__title {
+  color: #111827;
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.admin-reminder__text {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.admin-reminder-fade-enter-active,
+.admin-reminder-fade-leave-active,
+.admin-reminder-fade-move {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.admin-reminder-fade-enter-from,
+.admin-reminder-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes admin-reminder-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
 .metric-card-success strong {
   color: #15803d;
 }
@@ -189,15 +348,6 @@ onMounted(() => {
   margin: 0;
   font-size: 1.2rem;
   color: #0f172a;
-}
-
-.audit-link {
-  border: none;
-  background: rgba(185, 28, 28, 0.08);
-  color: #b91c1c;
-  border-radius: 999px;
-  padding: 8px 14px;
-  cursor: pointer;
 }
 
 .log-list {
@@ -256,6 +406,15 @@ onMounted(() => {
   .panel-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .admin-reminder-stack {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .admin-reminder {
+    width: calc(100vw - 32px);
   }
 }
 </style>
