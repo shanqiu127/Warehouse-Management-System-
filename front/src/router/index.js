@@ -12,6 +12,7 @@ const SUPERADMIN_ALLOWED_PATHS = new Set([
   '/system/security-ip-policy',
   '/system/login-log',
   '/system/operation-log',
+  '/assistant/project',
   '/403'
 ])
 
@@ -164,6 +165,12 @@ const router = createRouter({
           name: "WorkRequirementDetail",
           component: () => import("../views/WorkRequirementDetailView.vue"),
           meta: { roles: ['employee', 'admin'] }
+        },
+        {
+          path: "assistant/project",
+          name: "ProjectAssistant",
+          component: () => import("../views/system/ProjectAssistantView.vue"),
+          meta: { roles: ['superadmin', 'admin', 'employee'] }
         }
       ]
     },

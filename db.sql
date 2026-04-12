@@ -974,5 +974,61 @@ CREATE TABLE `work_requirement_attachment` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工作要求执行附件表';
 
 -- =============================================
+-- AI 助手对话历史表
+-- =============================================
+
+-- AI 对话会话表
+CREATE TABLE `ai_conversation` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `title` VARCHAR(100) NOT NULL COMMENT '会话标题（首条问题前50字）',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_created` (`user_id`, `created_at` DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI助手对话会话表';
+
+-- AI 对话消息表
+CREATE TABLE `ai_message` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `conversation_id` BIGINT NOT NULL COMMENT '所属会话ID',
+    `role` VARCHAR(20) NOT NULL COMMENT '消息角色: user/assistant',
+    `content` TEXT NOT NULL COMMENT '消息内容',
+    `sources_json` TEXT DEFAULT NULL COMMENT '来源文档JSON（仅assistant消息）',
+    `hit_type` VARCHAR(30) DEFAULT NULL COMMENT '命中类型（仅assistant消息）',
+    `provider_code` VARCHAR(32) DEFAULT NULL COMMENT '模型供应商编码（仅assistant消息）',
+    `model_code` VARCHAR(64) DEFAULT NULL COMMENT '模型编码（仅assistant消息）',
+    `fallback_used` TINYINT(1) DEFAULT NULL COMMENT '是否发生模型回退（仅assistant消息）',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_conv` (`conversation_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI助手对话消息表';
+
+CREATE TABLE `ai_model_call_log` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `user_id` BIGINT NOT NULL COMMENT '用户ID',
+    `role_code` VARCHAR(20) DEFAULT NULL COMMENT '发起调用的角色编码',
+    `dept_code` VARCHAR(32) DEFAULT NULL COMMENT '发起调用的部门编码',
+    `conversation_id` BIGINT DEFAULT NULL COMMENT '所属会话ID',
+    `assistant_message_id` BIGINT DEFAULT NULL COMMENT '对应assistant消息ID',
+    `scene_code` VARCHAR(32) NOT NULL DEFAULT 'project-assistant' COMMENT '调用场景编码',
+    `question_type` VARCHAR(20) DEFAULT NULL COMMENT '问题类型：project/general',
+    `requested_model_code` VARCHAR(64) DEFAULT NULL COMMENT '用户请求模型编码',
+    `provider_code` VARCHAR(32) DEFAULT NULL COMMENT '模型供应商编码',
+    `model_code` VARCHAR(64) DEFAULT NULL COMMENT '实际模型编码',
+    `fallback_used` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否触发模型回退',
+    `hit_type` VARCHAR(30) DEFAULT NULL COMMENT '命中类型',
+    `result_status` VARCHAR(20) NOT NULL DEFAULT 'success' COMMENT '结果状态',
+    `latency_ms` BIGINT DEFAULT NULL COMMENT '模型调用耗时（毫秒）',
+    `question_excerpt` VARCHAR(200) DEFAULT NULL COMMENT '问题摘要，不记录完整请求体',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_user_created` (`user_id`, `created_at` DESC),
+    KEY `idx_conv_created` (`conversation_id`, `created_at` DESC),
+    KEY `idx_message` (`assistant_message_id`),
+    KEY `idx_model_status_created` (`model_code`, `result_status`, `created_at` DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI模型调用审计表';
+
+-- =============================================
 -- 脚本执行完成
 -- =============================================

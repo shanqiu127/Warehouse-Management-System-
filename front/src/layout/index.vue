@@ -117,6 +117,7 @@
         <router-view />
       </el-main>
     </el-container>
+    <AssistantLauncher v-if="showAssistantLauncher" />
   </el-container>
 </template>
 
@@ -124,6 +125,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed, ref } from 'vue'
 import MessageCenter from '@/components/MessageCenter.vue'
+import AssistantLauncher from '@/components/assistant/AssistantLauncher.vue'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import { isAdminRole, isEmployeeRole, isSuperAdmin, normalizeDeptCode } from '@/utils/auth'
@@ -149,6 +151,7 @@ const showSidebar = computed(() => !isEmployee.value)
 const sidebarWidth = computed(() => (isSidebarCollapsed.value ? '64px' : '220px'))
 const showSuperAdminCenter = computed(() => isSuperAdmin(userStore.role))
 const showMessageCenter = computed(() => !showSuperAdminCenter.value)
+const showAssistantLauncher = computed(() => route.path === '/home')
 const defaultOpeneds = computed(() => {
   if (!showSuperAdminCenter.value) {
     return []

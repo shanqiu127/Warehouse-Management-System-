@@ -13,6 +13,7 @@ front/node_modules/
 *.secret
 *.key
 *.pem
+back/assistant-llm.env
 
 
 
@@ -46,3 +47,5 @@ twelve-auth.postman_collection.json
 
 front.pen
 new.pen
+develop-doxc
+.vscode/launch.json
