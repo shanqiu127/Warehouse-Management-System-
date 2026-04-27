@@ -53,10 +53,10 @@ public class UserManageService {
 
     @Autowired
     private AuthzService authzService;
-
+    //业务消息通知
     @Autowired
     private MessageService messageService;
-
+    //分页查用户，按照角色/部门范围控制查询
     public PageResult<UserVO> page(UserQueryDTO queryDTO) {
         LoginResponse.UserInfoVO operator = authzService.currentUser();
         String normalizedRoleFilter = authzService.normalizeRole(queryDTO.getRole());
@@ -86,11 +86,12 @@ public class UserManageService {
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
     }
 
+    //查用户，按照角色/部门范围控制查询
     public UserVO getById(Long id) {
         SysUser user = requireManageableUser(id);
         return toVO(user, user.getDeptId() == null ? null : sysDeptMapper.selectById(user.getDeptId()));
     }
-
+    //声明式事务，保证一致性，事务回滚
     @Transactional(rollbackFor = Exception.class)
     public void create(UserSaveDTO dto) {
         LoginResponse.UserInfoVO operator = authzService.currentUser();
@@ -99,12 +100,14 @@ public class UserManageService {
         SysDept dept = validateAndResolveDept(dto.getRole(), dto.getDeptId(), operator);
         checkUsernameUnique(dto.getUsername(), null);
         SysUser user = new SysUser();
+        //复制属性
         BeanUtils.copyProperties(dto, user);
         user.setDeptId(dept == null ? null : dept.getId());
         user.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         user.setPassword(BCrypt.hashpw(DEFAULT_PASSWORD));
         sysUserMapper.insert(user);
         syncEmployeeProfileForManagedUser(user, null);
+        //站内邮箱功能：发送“新员工密码提醒”
         if (shouldNotifyManagedEmployee(user)) {
             messageService.sendNewEmployeePasswordReminder(user.getRealName(), user.getDeptId(), authzService.currentOperatorLabel());
         }
@@ -129,6 +132,7 @@ public class UserManageService {
         user.setPhone(dto.getPhone());
         user.setEmail(dto.getEmail());
         sysUserMapper.updateById(user);
+        //保证sys_user和sys_employee一致
         syncEmployeeProfileForManagedUser(user, oldRole);
 
         String newRole = authzService.normalizeRole(user.getRole());
@@ -201,7 +205,9 @@ public class UserManageService {
             messageService.sendEmployeePasswordChangedReminder(targetUser.getRealName(), targetUser.getDeptId(), authzService.currentOperatorLabel());
         }
     }
-
+    /**
+     * 鉴权是否登录+获取当前登录用户对应的用户实体
+     */
     private SysUser requireCurrentUser() {
         Object loginId = StpUtil.getLoginIdDefaultNull();
         if (loginId == null) {
@@ -210,7 +216,13 @@ public class UserManageService {
         Long userId = Long.valueOf(String.valueOf(loginId));
         return requireUser(userId);
     }
-
+/**
+ * 获取可管理用户（含权限校验）。
+ *
+ * @param id 用户ID
+ * @return 用户对象
+ * @throws BusinessException 用户不存在或当前操作者无权限
+ */
     private SysUser requireManageableUser(Long id) {
         SysUser user = requireUser(id);
         if (authzService.isSuperAdmin()) {
@@ -219,13 +231,23 @@ public class UserManageService {
         assertAdminCanManageUser(user);
         return user;
     }
-
+    /**
+     * 验证角色合法的白名单
+     * 包含employee、superadmin、admin
+     * @param role
+     */
     private void validateRoleForManage(String role) {
         if (!ROLE_SUPERADMIN.equals(role) && !ROLE_ADMIN.equals(role) && !ROLE_EMPLOYEE.equals(role)) {
             throw BusinessException.validateFail("用户角色仅支持 superadmin、admin 或 employee");
         }
     }
-
+    /**
+     * 验证目标角色和部门合法性，并返回部门信息
+     * @param targetRole 目标角色
+     * @param deptId 部门id
+     * @param operator 当前操作的用户信息
+     * @return 部门对象
+     */
     private SysDept validateAndResolveDept(String targetRole, Long deptId, LoginResponse.UserInfoVO operator) {
         String normalizedRole = authzService.normalizeRole(targetRole);
         if (ROLE_SUPERADMIN.equals(normalizedRole)) {
@@ -247,13 +269,22 @@ public class UserManageService {
         }
         return dept;
     }
-
+    /**
+     * 拒绝超级管理员创建超级管理员账号
+     * @param role
+     * @throws BusinessException 如果角色为超级管理员，则抛出异常
+     */
     private void rejectSuperadminCreate(String role) {
         if (ROLE_SUPERADMIN.equals(role)) {
-            throw BusinessException.validateFail("超级管理员账号仅允许系统初始化，不支持在用户管理中新增");
+            throw BusinessException.validateFail("超级管理员账号仅允许在系统中创建，不支持在用户管理中新增");
         }
     }
-
+    /**
+     * 涉及 superadmin 的角色变更一律禁止
+     * @param oldRole 旧角色
+     * @param newRole 新角色
+     * 
+     */
     private void validateSuperadminRoleChange(String oldRole, String newRole) {
         if (!StringUtils.hasText(oldRole) || !StringUtils.hasText(newRole)) {
             return;
@@ -265,7 +296,12 @@ public class UserManageService {
             throw BusinessException.validateFail("普通账号不允许修改为超级管理员");
         }
     }
-
+    /**
+     * 验证用户名唯一性
+     * @param username 用户名
+     * @param excludeId 排除的用户id
+     * @throws BusinessException 如果用户名已存在，则抛出异常
+     */
     private void checkUsernameUnique(String username, Long excludeId) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SysUser::getUsername, username)
@@ -274,7 +310,11 @@ public class UserManageService {
             throw BusinessException.validateFail("用户名已存在");
         }
     }
-
+    /**
+     * 
+     * @param id
+     * @return 根据id查询到用户的实体
+     */
     private SysUser requireUser(Long id) {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) {
@@ -282,22 +322,36 @@ public class UserManageService {
         }
         return user;
     }
-
+    /**
+     * 当前部门管理员=目标部门管理员才可以操作本部门员工
+     * @param user
+     * @return 只能操作employe角色和只能操作本部门员工
+     */
     private void assertAdminCanManageUser(SysUser user) {
         if (!ROLE_EMPLOYEE.equals(authzService.normalizeRole(user.getRole()))) {
             throw BusinessException.forbidden("部门管理员仅可操作本部门员工账号");
         }
         authzService.requireCurrentDept(user.getDeptId(), "部门管理员仅可操作本部门员工账号");
     }
-
+    /**
+     * 
+     * 限定于人事管理员和超级管理员的新增动作
+     * @param user 新员工
+     * @return 是否触发人事管理员和超级管理员新增用户的动作
+     */
     private boolean shouldNotifyManagedEmployee(SysUser user) {
         String role = authzService.normalizeRole(user.getRole());
         return ROLE_EMPLOYEE.equals(role) && (authzService.isSuperAdmin() || authzService.isHrAdmin());
     }
-
+    /**
+     * 同步员工档案（新角色是员工就保证有且更新员工档案；新角色不是员工但旧角色是员工就删档案。新旧角色都不是员工就不做任何操作）
+     * @param user 用户
+     * @param oldRole 旧角色
+     */
     private void syncEmployeeProfileForManagedUser(SysUser user, String oldRole) {
         String normalizedOldRole = authzService.normalizeRole(oldRole);
         String normalizedNewRole = authzService.normalizeRole(user.getRole());
+        //user==员工
         if (ROLE_EMPLOYEE.equals(normalizedNewRole)) {
             SysEmployee employee = findEmployeeProfileByUserId(user.getId());
             if (employee == null) {
@@ -309,7 +363,7 @@ public class UserManageService {
             }
             return;
         }
-
+        //user=null,oldRole=员工，(说明从员工->非员工）删除员工档案
         if (ROLE_EMPLOYEE.equals(normalizedOldRole)) {
             deleteEmployeeProfileByUserId(user.getId());
         }

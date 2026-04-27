@@ -4,7 +4,7 @@ import org.example.back.common.exception.BusinessException;
 import org.springframework.util.StringUtils;
 
 import java.util.regex.Pattern;
-
+//密码策略工具类：提供密码强度校验功能，确保用户设置的密码符合安全要求。
 public final class PasswordPolicyUtil {
 
     private static final int MIN_LENGTH = 8;
@@ -13,7 +13,11 @@ public final class PasswordPolicyUtil {
 
     private PasswordPolicyUtil() {
     }
-
+    /**
+     * 检验新密码的要求
+     * @param password
+     * @param fieldLabel
+     */
     public static void validateUserPassword(String password, String fieldLabel) {
         String label = StringUtils.hasText(fieldLabel) ? fieldLabel.trim() : "密码";
         if (!StringUtils.hasText(password)) {

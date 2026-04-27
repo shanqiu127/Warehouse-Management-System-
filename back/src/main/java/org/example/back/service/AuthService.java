@@ -50,6 +50,7 @@ public class AuthService {
      * @return 登录响应，包含 token 和用户信息
      */
     public LoginResponse login(LoginRequest request) {
+        //根据前端输入的用户名，去用户表里查这个用户，返回用户对象。
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(SysUser::getUsername, request.getUsername());
         SysUser user = sysUserMapper.selectOne(queryWrapper);
@@ -87,6 +88,7 @@ public class AuthService {
     /**
      * 用户注册（仅允许创建普通用户）
      */
+    //声明式注解，用户注册方法执行后根据结果提交或回滚事务。
     @Transactional(rollbackFor = Exception.class)
     public void register(RegisterRequest request) {
         PasswordPolicyUtil.validateUserPassword(request.getPassword(), "密码");
@@ -98,10 +100,11 @@ public class AuthService {
         }
 
         SysDept dept = requireRegisterDept(request.getDeptId());
+        //处理真实名字
         String realName = request.getRealName() == null || request.getRealName().isBlank()
                 ? request.getUsername()
                 : request.getRealName().trim();
-
+        //创建用户
         SysUser user = new SysUser();
         user.setUsername(request.getUsername());
         user.setPassword(BCrypt.hashpw(request.getPassword()));
@@ -110,7 +113,7 @@ public class AuthService {
         user.setDeptId(dept.getId());
         user.setStatus(STATUS_ENABLED);
         sysUserMapper.insert(user);
-
+        //根据user创建员工档案
         createEmployeeProfile(user);
     }
 
@@ -156,6 +159,9 @@ public class AuthService {
      *
      * @param user 用户实体
      * @return 用户信息 VO
+     * 数据库实体Entity → 转成前端实体vo
+     * 前端传数据 → DTO
+       后端返数据 → VO
      */
     private LoginResponse.UserInfoVO buildUserInfoVO(SysUser user) {
         LoginResponse.UserInfoVO vo = new LoginResponse.UserInfoVO();
@@ -178,7 +184,7 @@ public class AuthService {
     }
 
     /**
-     * 检查当前用户是否为管理员
+     * 检查当前用户是否为管理员或者超级管理员
      *
      * @return true\-管理员，false\-非管理员
      */
@@ -233,7 +239,7 @@ public class AuthService {
         employee.setStatus(user.getStatus());
         sysEmployeeMapper.insert(employee);
     }
-
+    //写入登录态（包含用户信息、角色、部门ID、部门编码）的上下文
     private void syncLoginSession(LoginResponse.UserInfoVO userInfo) {
         StpUtil.getSession().set("userInfo", userInfo);
         StpUtil.getSession().set("role", normalizeRole(userInfo.getRole()));

@@ -62,7 +62,7 @@ public class AuthzService {
     public boolean isAdminOrSuperAdmin() {
         return isAdmin() || isSuperAdmin();
     }
-
+    //currentDeptId()==targetDeptId
     public boolean hasDeptAccess(Long targetDeptId) {
         if (isSuperAdmin()) {
             return true;
@@ -97,7 +97,11 @@ public class AuthzService {
             throw BusinessException.forbidden(message);
         }
     }
-
+    /**
+     * 验证当前用户是否具有访问目标部门的权限
+     * @param targetDeptId 目标部门id
+     * @param message 当没有权限时，抛出的异常信息
+     */
     public void requireCurrentDept(Long targetDeptId, String message) {
         if (!hasDeptAccess(targetDeptId)) {
             throw BusinessException.forbidden(message);
@@ -135,17 +139,19 @@ public class AuthzService {
         if (deptId == null) {
             throw BusinessException.validateFail("所属部门不能为空");
         }
+        //MyBatis-Plus功能:sysDeptMapper继承BaseMapper，会自动生成selectById方法
         SysDept dept = sysDeptMapper.selectById(deptId);
         if (dept == null) {
             throw BusinessException.validateFail("所属部门不存在");
         }
         return dept;
     }
-
+    //规范化角色名称
     public String normalizeRole(String role) {
         if (role == null) {
             return "";
         }
+        //去除前后空格，并转换为小写
         return role.trim().toLowerCase(Locale.ROOT);
     }
 

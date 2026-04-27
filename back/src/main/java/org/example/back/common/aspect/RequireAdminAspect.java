@@ -23,8 +23,9 @@ public class RequireAdminAspect {
     private AuthzService authzService;
 
     /**
-     * 在方法执行前进行权限校验
+     * 在使用@RequireAdmin注解的接口方法执行前进行权限校验
      */
+    //不管在方法上还是类上，只要有 @RequireAdmin 注解都要进行管理员权限校验
     @Before("@annotation(org.example.back.common.annotation.RequireAdmin) || @within(org.example.back.common.annotation.RequireAdmin)")
     public void checkAdminPermission(JoinPoint joinPoint) {
         // 1. 获取方法签名
