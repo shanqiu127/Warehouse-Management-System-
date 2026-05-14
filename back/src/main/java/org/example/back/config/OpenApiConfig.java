@@ -17,10 +17,10 @@ public class OpenApiConfig {
         String schemeName = "BearerAuth";
         return new OpenAPI()
                 .info(new Info()
-                        .title("仓库管理系统后端 API")
+                        .title("企业协同运营管理系统后端 API")
                         .description("全项目版：覆盖认证授权、系统管理、安全治理、基础资料、进销退存业务与销售统计分析，支持作废与红冲闭环流程")
                         .version("v1.6.0")
-                        .contact(new Contact().name("WMS Backend Team")))
+                        .contact(new Contact().name("ECS Backend Team")))
                 .addSecurityItem(new SecurityRequirement().addList(schemeName))
                 .components(new Components().addSecuritySchemes(schemeName,
                         new SecurityScheme()

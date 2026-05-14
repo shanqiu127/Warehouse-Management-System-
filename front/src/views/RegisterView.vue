@@ -7,10 +7,10 @@
 
     <main class="register-shell">
       <section class="brand-panel">
-        <p class="brand-tag">WAREHOUSE MANAGEMENT SYSTEM</p>
-        <h1>开始你的<br>仓储协作</h1>
+        <p class="brand-tag">ENTERPRISE COLLABORATION OPERATIONS SYSTEM</p>
+        <h1>开始你的<br>协同运营</h1>
         <p class="brand-desc">
-          一个现代化的仓储管理解决方案
+          一个现代化的企业协同运营解决方案
         </p>
         <ul class="brand-metrics">
           <li>

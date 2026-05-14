@@ -1,4 +1,4 @@
-﻿# 仓库管理系统项目目录结构
+﻿# 企业协同运营管理系统项目目录结构
 
 ## 1. 项目概览
 
@@ -33,7 +33,7 @@
 
 ## 2. 当前目录结构（精简主干）
 
-- Warehouse Management System/
+- Enterprise Collaboration Operations System (ECS)/
 - db.sql
 - README.md
 - back/

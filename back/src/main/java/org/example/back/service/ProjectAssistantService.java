@@ -29,7 +29,7 @@ public class ProjectAssistantService {
 
     private static final String NO_EVIDENCE_MSG = "抱歉，我没有找到相关的知识库，请您提供更多的信息或者尝试其他的关键词。接下来采用大模型进行搜索为你解答。";
     private static final String STRICT_MODE_NO_EVIDENCE_MSG = "仅按项目文档回答模式下，当前未找到足够依据回答这个问题。你可以补充更具体的项目关键词，或切换到“文档优先，不足时允许模型补充”。";
-    private static final String NON_PROJECT_MSG = "我目前只负责说明当前仓库管理系统项目，暂时不回答项目范围外的问题。你可以问我项目功能、技术栈、部署方式、模块职责、接口范围、角色权限或业务流程。";
+    private static final String NON_PROJECT_MSG = "我目前只负责说明当前企业协同运营管理系统（ECS）项目，暂时不回答项目范围外的问题。你可以问我项目功能、技术栈、部署方式、模块职责、接口范围、角色权限或业务流程。";
     private static final String GENERAL_QUERY_LIMIT_MSG = "这个问题可能触发较长推理或 token 消耗过高，已暂停回答。请缩小范围，或改成更直接的问题。";
 
     private static final Map<String, String> SOURCE_TYPE_LABELS = Map.of(
@@ -283,7 +283,7 @@ public class ProjectAssistantService {
 
     private String buildSystemPrompt(String role, String deptCode, String roleLabel, AssistantAnswerMode mode) {
         StringBuilder sb = new StringBuilder();
-        sb.append("你是当前仓库管理系统项目的说明助手。\n");
+        sb.append("你是当前企业协同运营管理系统（ECS）项目的说明助手。\n");
         sb.append("你只能根据提供的项目文档片段回答。\n");
         sb.append("你必须遵守当前角色的知识边界。\n");
         sb.append("如果文档片段不足，请只给出能够确认的信息，不要编造不存在的细节。\n");

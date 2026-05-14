@@ -89,7 +89,7 @@ public class ProjectKnowledgeRetrievalService {
                 }
             }
         }
-        if (q.contains("这个项目") || q.contains("这个系统") || q.contains("仓库管理系统")) {
+        if (q.contains("这个项目") || q.contains("这个系统") || q.contains("仓库管理系统") || q.contains("企业协同运营管理系统") || q.contains("ecs")) {
             return true;
         }
         return PROJECT_CONTEXT_KEYWORDS.stream().anyMatch(q::contains);

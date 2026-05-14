@@ -7,28 +7,28 @@
 
     <main class="login-shell">
       <section class="brand-panel">
-        <p class="brand-tag">WAREHOUSE MANAGEMENT SYSTEM</p>
-        <h1>仓储秩序，<br>由你掌控</h1>
+        <p class="brand-tag">ENTERPRISE COLLABORATION OPERATIONS SYSTEM</p>
+        <h1>协同有序，<br>运营可控</h1>
         <p class="brand-desc">
-          聚焦进货、退货、销售盘点，
+          覆盖进销退存、审批追溯、任务闭环与消息协同，
           让每一次流转都可追溯、可分析、可复盘。
         </p>
         <ul class="brand-metrics">
           <li>
-            <strong>进货</strong>
-            <span>批次与供应商追踪</span>
+            <strong>进销存</strong>
+            <span>进销退存与库存联动</span>
           </li>
           <li>
-            <strong>退货</strong>
-            <span>退货流程与原因分析</span>
+            <strong>审批追溯</strong>
+            <span>作废/红冲闭环留痕</span>
           </li>
           <li>
-            <strong>作废红冲</strong>
-            <span>作废与红冲流程管理</span>
+            <strong>任务闭环</strong>
+            <span>工作要求发布与审核</span>
           </li>
           <li>
-            <strong>统计</strong>
-            <span>数据可视化与分析图</span>
+            <strong>治理分析</strong>
+            <span>统计图表与审计日志</span>
           </li>
         </ul>
       </section>
@@ -37,7 +37,7 @@
         <div class="panel-header">
           <p class="kicker">SIGN IN</p>
           <h2>欢迎回来</h2>
-          <p class="subtitle">输入账号信息进入仓储后台系统</p>
+          <p class="subtitle">输入账号信息进入企业协同运营后台</p>
         </div>
 
         <el-form
